@@ -49,6 +49,22 @@
 	}
 
 
+	$dh = SSLinfo::dh_size( $server );
+	if ( $dh )
+	{
+		print( "\nDiffie-Helmann parameter size:  " );
+
+		if ( $dh < 1526 )
+			print( red( $dh . "   WEAK" ) );
+		elseif ( $dh < 2048 )
+			print( yellow( $dh ) );
+		else
+			print( green( $dh ) );
+
+		print( "\n" );
+	}
+
+
 	print( "\n" );
 
 	print( "Cipher suites, in server-preferred order:\n" );
@@ -956,6 +972,16 @@
 			return null;
 		}
 
+		public static function dh_size( $server )
+		{
+			// "true | openssl s_client -connect mainpresswiki.nl:443 -servername www.mainpresswiki.nl -msg -cipher 'DH' 2>&1 | grep '0c 00 03 0b .. ..'"
+			$op = self::s_client( $server, array( "*DH" ) );
+			if ( !preg_match( "/ServerKeyExchange\\n\\s+0c 00 03 0b ((..) (..))/muis", $op, $A ) )
+				return null;
+
+			return 8*hexdec("{$A[2]}{$A[3]}");
+		}
+
 		public static function server_probe( $server, $protocol = "TLS10" )
 		{
 			if ( !isset(self::$map) )  self::init_though();
@@ -1039,6 +1065,9 @@
 		public static function cipher_name( $s )
 		{
 			if ( !isset(self::$map) )  self::init_though();
+
+			if ( substr($s,0,1) == "*" )
+				return substr($s,1);
 
 			return @self::$map[$s]["openssl-name"];
 		}
