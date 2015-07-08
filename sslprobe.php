@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 	
 	$server = $argv[1];
