@@ -1086,28 +1086,26 @@
 
 		public static function ecbits_to_ff( $b )
 		{
-			// TODO: interpolate
-			if ( $b < 128 )        return 512;
-			elseif ( $b <= 160 )   return 1024;
-			elseif ( $b <= 224 )   return 2048;
-			elseif ( $b <= 256 )   return 3072;
-			elseif ( $b <= 384 )   return 7680;
-			elseif ( $b <= 521 )   return 15360;
+			// Lagrange interpolation of the NIST recommendation table:
+			//  160  →   1024
+			//  224  →   2048
+			//  256  →   3072
+			//  384  →   7680
+			//  521  →  15360
 
-			return 30000;
+			return round( 2.2247113318292543e-06 * ($b*$b*$b*$b) - 0.002910544879983633 * ($b*$b*$b) + 1.4166053052358345 * ($b*$b) - 267.8476746244936 * $b + 18078.137135866877 );
 		}
 
 		public static function ecbits_to_symmetric( $b )
 		{
-			// TODO: interpolate
-			if ( $b < 128 )        return 64;
-			elseif ( $b <= 160 )   return 80;
-			elseif ( $b <= 224 )   return 112;
-			elseif ( $b <= 256 )   return 128;
-			elseif ( $b <= 384 )   return 192;
-			elseif ( $b <= 521 )   return 256;
+			// Lagrange interpolation of the NIST recommendation table:
+			//  160  →  80
+			//  224  →  112
+			//  256  →  128
+			//  384  →  192
+			//  521  →  256
 
-			return 512;
+			return round( 1.1838110189986005e-06 * ($b*$b*$b) - 0.0004391938880483129 * ($b*$b) + 0.5701573762299863 * $b - 4.073067544406371 );
 		}
 
 		public static function format_cipher( $s )
