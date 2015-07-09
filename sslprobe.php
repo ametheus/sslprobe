@@ -50,16 +50,40 @@
 
 
 	$dh = SSLinfo::dh_size( $server );
+	$ecdh = SSLinfo::ecdh_size( $server );
+	if ( $dh || $ecdh )
+		print( "\n" );
+
 	if ( $dh )
 	{
-		print( "\nDiffie-Helmann parameter size:  " );
+		print( "Diffie-Helmann parameter size:           " );
+
+		$fdh = sprintf( "%5d", $dh );
 
 		if ( $dh < 1526 )
-			print( red( $dh . "   WEAK" ) );
+			print( red( $fdh . "   WEAK" ) );
 		elseif ( $dh < 2048 )
-			print( yellow( $dh ) );
+			print( yellow( $fdh ) );
 		else
-			print( green( $dh ) );
+			print( green( $fdh ) );
+
+		print( "\n" );
+	}
+	if ( $ecdh )
+	{
+		print( "Elliptic curve:  " . purple($ecdh["name"]) . ";  " );
+
+		$eqdh = SSLinfo::ecbits_to_ff( $ecdh["ecbits"] );
+
+		$fecdh = sprintf( "%4d", $ecdh["ecbits"] );
+		$feqdh = sprintf( "%5d", $eqdh );
+
+		if ( $eqdh <= 1526 )
+			print( red( $fecdh ) . " -> eq. " . red( $feqdh . "   WEAK" ) );
+		elseif ( $eqdh <= 2048 )
+			print( yellow( $fecdh ) . " -> eq. " . yellow( $feqdh ) );
+		else
+			print( green( $fecdh ) . " -> eq. " . green( $feqdh ) );
 
 		print( "\n" );
 	}
@@ -87,6 +111,7 @@
 	class SSLinfo
 	{
 		protected static $map;
+		protected static $curve_map;
 
 		public static function init_though()
 		{
@@ -340,6 +365,34 @@
 				"TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256"       => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "DHE-RSA-CHACHA20-POLY1305", ),
 				"SSL_CK_RC4_64_WITH_MD5"                          => array( "cipher-strength" =>   64, "forward-secrecy" => false, "aead" => false, "openssl-name" => "RC4-64-MD5", ),
 
+			);
+
+			self::$curve_map = array(
+				1  => array( "name" => "sect163k1", "ecbits" => 163, "backdoored" => false, ),
+				2  => array( "name" => "sect163r1", "ecbits" => 163, "backdoored" => false, ),
+				3  => array( "name" => "sect163r2", "ecbits" => 163, "backdoored" => false, ),
+				4  => array( "name" => "sect193r1", "ecbits" => 193, "backdoored" => false, ),
+				5  => array( "name" => "sect193r2", "ecbits" => 193, "backdoored" => false, ),
+				6  => array( "name" => "sect233k1", "ecbits" => 233, "backdoored" => false, ),
+				7  => array( "name" => "sect233r1", "ecbits" => 233, "backdoored" => false, ),
+				8  => array( "name" => "sect239k1", "ecbits" => 239, "backdoored" => false, ),
+				9  => array( "name" => "sect283k1", "ecbits" => 283, "backdoored" => false, ),
+				10 => array( "name" => "sect283r1", "ecbits" => 283, "backdoored" => false, ),
+				11 => array( "name" => "sect409k1", "ecbits" => 409, "backdoored" => false, ),
+				12 => array( "name" => "sect409r1", "ecbits" => 409, "backdoored" => false, ),
+				13 => array( "name" => "sect571k1", "ecbits" => 571, "backdoored" => false, ),
+				14 => array( "name" => "sect571r1", "ecbits" => 571, "backdoored" => false, ),
+				15 => array( "name" => "secp160k1", "ecbits" => 160, "backdoored" => false, ),
+				16 => array( "name" => "secp160r1", "ecbits" => 160, "backdoored" => false, ),
+				17 => array( "name" => "secp160r2", "ecbits" => 160, "backdoored" => false, ),
+				18 => array( "name" => "secp192k1", "ecbits" => 192, "backdoored" => false, ),
+				19 => array( "name" => "secp192r1", "ecbits" => 192, "backdoored" => false, ),
+				20 => array( "name" => "secp224k1", "ecbits" => 224, "backdoored" => false, ),
+				21 => array( "name" => "secp224r1", "ecbits" => 224, "backdoored" => false, ),
+				22 => array( "name" => "secp256k1", "ecbits" => 256, "backdoored" => false, ),
+				23 => array( "name" => "secp256r1", "ecbits" => 256, "backdoored" => false, ),
+				24 => array( "name" => "secp384r1", "ecbits" => 384, "backdoored" => false, ),
+				25 => array( "name" => "secp521r1", "ecbits" => 521, "backdoored" => false, ),
 			);
 		}
 
@@ -976,10 +1029,30 @@
 		{
 			// "true | openssl s_client -connect mainpresswiki.nl:443 -servername www.mainpresswiki.nl -msg -cipher 'DH' 2>&1 | grep '0c 00 03 0b .. ..'"
 			$op = self::s_client( $server, array( "*DH" ) );
-			if ( !preg_match( "/ServerKeyExchange\\n\\s+0c 00 03 0b ((..) (..))/muis", $op, $A ) )
+			if ( !preg_match( "/ServerKeyExchange\\n\\s+0c .. .. .. ((..) (..))/muis", $op, $A ) )
 				return null;
 
 			return 8*hexdec("{$A[2]}{$A[3]}");
+		}
+
+		public static function ecdh_size( $server )
+		{
+			// "true | openssl s_client -connect mainpresswiki.nl:443 -servername www.mainpresswiki.nl -msg -cipher 'DH' 2>&1 | grep '0c 00 03 0b .. ..'"
+			$op = self::s_client( $server, array( "*ECDH" ) );
+			if ( preg_match( "/ServerKeyExchange\\n\\s+0c .. .. .. 03 ((..) (..))/muis", $op, $A ) )
+			{
+				$curve_id = hexdec("{$A[2]}{$A[3]}");
+				if ( isset(self::$curve_map[$curve_id]) )
+				{
+					return self::$curve_map[$curve_id];
+				}
+
+				return array( "name" => sprintf("Unknown named curve %4x",$curve_id), "ecbits" => 1 );
+			}
+
+			// TODO: non-named curves
+
+			return null;
 		}
 
 		public static function server_probe( $server, $protocol = "TLS10" )
@@ -1009,6 +1082,32 @@
 			}
 
 			return $rv;
+		}
+
+		public static function ecbits_to_ff( $b )
+		{
+			// TODO: interpolate
+			if ( $b < 128 )        return 512;
+			elseif ( $b <= 160 )   return 1024;
+			elseif ( $b <= 224 )   return 2048;
+			elseif ( $b <= 256 )   return 3072;
+			elseif ( $b <= 384 )   return 7680;
+			elseif ( $b <= 521 )   return 15360;
+
+			return 30000;
+		}
+
+		public static function ecbits_to_symmetric( $b )
+		{
+			// TODO: interpolate
+			if ( $b < 128 )        return 64;
+			elseif ( $b <= 160 )   return 80;
+			elseif ( $b <= 224 )   return 112;
+			elseif ( $b <= 256 )   return 128;
+			elseif ( $b <= 384 )   return 192;
+			elseif ( $b <= 521 )   return 256;
+
+			return 512;
 		}
 
 		public static function format_cipher( $s )
