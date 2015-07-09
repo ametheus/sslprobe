@@ -52,21 +52,24 @@
 
 	print( "\n" );
 
-	print( "Cipher suites, in server-preferred order:\n" );
-
-	$server_protocols = array_reverse( $server_protocols );
-	foreach ( $server_protocols as $p )
+	if ( !in_array( "--quick", $argv ) )
 	{
-		print( "{$p}\n" );
+		print( "Cipher suites, in server-preferred order:\n" );
 
-		$suites = SSLinfo::server_probe( $server, $p );
-		foreach ( $suites as $cc )
+		$server_protocols = array_reverse( $server_protocols );
+		foreach ( $server_protocols as $p )
 		{
-			print( "   " . SSLinfo::format_cipher($cc) . "\n" );
-		}
-	}
+			print( "{$p}\n" );
 
-	print( "\n" );
+			$suites = SSLinfo::server_probe( $server, $p );
+			foreach ( $suites as $cc )
+			{
+				print( "   " . SSLinfo::format_cipher($cc) . "\n" );
+			}
+		}
+
+		print( "\n" );
+	}
 
 
 	class SSLinfo
