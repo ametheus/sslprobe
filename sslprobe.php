@@ -1135,24 +1135,24 @@
 
 			$rv = $s;
 			if ( $colour )  $rv = $colour($s);
-			$rv .= str_repeat( " ", 56 - mb_strlen($s) );
-
-			if ( $ci["aead"] )
-				$rv .= " " . green("AEAD") . " ";
-			else
-				$rv .= "      ";
+			$rv .= str_repeat( " ", 46 - mb_strlen($s) );
 
 			if ( $ci["forward-secrecy"] )
-				$rv .= "   " . green("FS") . "    ";
+				$rv .= "   " . green("FS") . "   ";
 			else
-				$rv .= "  " . yellow("no FS") . "  ";
+				$rv .= "  " . yellow("no FS") . " ";
 
 			$cl = (int)$ci["cipher-strength"];
 			$rv .= str_repeat( " ", 4 - strlen($cl) );
 			if ( $colour )
 				$rv .= $colour( $cl );
+			elseif ( $ci["forward-secrecy"] && $ci["aead"] && $ci["cipher-strength"] > 128 )
+				$rv .= green( $cl );
 			else
 				$rv .= $cl;
+
+			if ( $ci["aead"] )
+				$rv .= "  " . green("AEAD") . " ";
 
 			return $rv;
 		}
