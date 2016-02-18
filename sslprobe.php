@@ -1,16 +1,18 @@
 #!/usr/bin/php
 <?php
+	chdir( __DIR__ );
 	
 	$server = $argv[1];
 
 	require_once( "termcolours.inc" );
 
+	print( "Version:   " . bblue(SSLinfo::openssl_version()) . "\n" );
 	print( "Server:    " . bblue($server) . "\n" );
 
 
 	print( "Protocol support:" );
 
-	$protos = array( "SSL2" => false, "SSL3" => false, "TLS10" => false, "TLS11" => false, "TLS12" => false );
+	$protos = array( "SSL3" => false, "TLS10" => false, "TLS11" => false, "TLS12" => false );
 	$server_protocols = array();
 	foreach ( $protos as $p => $k )
 	{
@@ -92,7 +94,7 @@
 
 	print( "\n" );
 
-	if ( !in_array( "--quick", $argv ) )
+	if ( !in_array( "--very-quick", $argv ) )
 	{
 		print( "Cipher suites, in server-preferred order:\n" );
 
@@ -106,6 +108,10 @@
 			{
 				print( "   " . SSLinfo::format_cipher($cc) . "\n" );
 			}
+			if ( !in_array( "--quick", $argv ) )
+			{
+				break;
+			}
 		}
 
 		print( "\n" );
@@ -116,9 +122,17 @@
 	{
 		protected static $map;
 		protected static $curve_map;
+		protected static $openssl;
 
 		public static function init_though()
 		{
+			self::$openssl = "openssl";
+
+			if ( is_executable("bin/custom-openssl") )
+			{
+				self::$openssl = "bin/custom-openssl";
+			}
+
 			self::$map = array(
 
 				// TLS v1.0 cipher suites.
@@ -285,6 +299,15 @@
 				"TLS_ECDHE_RSA_WITH_CAMELLIA_256_CBC_SHA384"      => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" => false, "openssl-name" => "ECDHE-RSA-CAMELLIA256-SHA384", ),
 				"TLS_ECDH_RSA_WITH_CAMELLIA_128_CBC_SHA256"       => array( "cipher-strength" =>  128, "forward-secrecy" => false, "aead" => false, "openssl-name" => "ECDH-RSA-CAMELLIA128-SHA256", ),
 				"TLS_ECDH_RSA_WITH_CAMELLIA_256_CBC_SHA384"       => array( "cipher-strength" =>  256, "forward-secrecy" => false, "aead" => false, "openssl-name" => "ECDH-RSA-CAMELLIA256-SHA384", ),
+
+				// CHACHA20 ciphersuites from  draft-ietf-tls-chacha20-poly1305-04
+				"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"   => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "ECDHE-ECDSA-CHACHA20-POLY1305", ),
+				"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"     => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "ECDHE-RSA-CHACHA20-POLY1305", ),
+				"TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256"       => array( "cipher-strength" =>  256, "forward-secrecy" => false, "aead" =>  true, "openssl-name" => "RSA-PSK-CHACHA20-POLY1305", ),
+				"TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256"       => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "DHE-PSK-CHACHA20-POLY1305", ),
+				"TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256"     => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "ECDHE-PSK-CHACHA20-POLY1305", ),
+				"TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256"       => array( "cipher-strength" =>  256, "forward-secrecy" =>  true, "aead" =>  true, "openssl-name" => "DHE-RSA-CHACHA20-POLY1305", ),
+				"TLS_PSK_WITH_CHACHA20_POLY1305_SHA256"           => array( "cipher-strength" =>  256, "forward-secrecy" => false, "aead" =>  true, "openssl-name" => "PSK-CHACHA20-POLY1305", ),
 
 				// Pre shared keying (PSK) cipheruites
 				"TLS_PSK_WITH_RC4_128_SHA"                        => array( "cipher-strength" =>  128, "forward-secrecy" => false, "aead" => false, "openssl-name" => "PSK-RC4-SHA", ),
@@ -1040,8 +1063,18 @@
 			);
 		}
 
+		public static function openssl_version()
+		{
+			if ( !isset(self::$openssl) )  self::init_though();
+
+			$openssl = self::$openssl;
+			return trim( shell_exec( "{$openssl} version" ) );
+		}
+
 		protected static function s_client( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
 		{
+			if ( !isset(self::$openssl) )  self::init_though();
+
 			if ( is_string($ciphers) )
 				$ciphers = [ $ciphers ];
 
@@ -1052,7 +1085,6 @@
 			$host = escapeshellarg( $host );
 
 			$prt = [];
-			if ( !$protos["SSL2"]  ) $prt[] = "-no_ssl2";
 			if ( !$protos["SSL3"]  ) $prt[] = "-no_ssl3";
 			if ( !$protos["TLS10"] ) $prt[] = "-no_tls1";
 			if ( !$protos["TLS11"] ) $prt[] = "-no_tls1_1";
@@ -1060,7 +1092,8 @@
 
 			$prt = implode( " ", $prt );
 
-			return shell_exec( "true | openssl s_client -msg -prexit {$prt} {$cc} -connect {$host} 2>&1" );
+			$openssl = self::$openssl;
+			return shell_exec( "true | {$openssl} s_client -msg -prexit {$prt} {$cc} -connect {$host} 2>&1" );
 		}
 
 		public static function connect( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
@@ -1081,7 +1114,10 @@
 			$proto = substr($A[1],0,3);
 
 			if ( preg_match( "/^\s+Cipher\s*:\s+([a-zA-Z0-9_.-]+)$/mus", $op, $A ) )
+			{
+				if ( $A[1] == "0000" )  return null;
 				return self::cipher_lookup( $A[1], $proto );
+			}
 
 			fwrite( STDERR, $op );
 			return null;
@@ -1089,7 +1125,6 @@
 
 		public static function dh_size( $server )
 		{
-			// "true | openssl s_client -connect mainpresswiki.nl:443 -servername www.mainpresswiki.nl -msg -cipher 'DH' 2>&1 | grep '0c 00 03 0b .. ..'"
 			$op = self::s_client( $server, array( "*DH" ) );
 			if ( !preg_match( "/ServerKeyExchange\\n\\s+0c .. .. .. ((..) (..))/muis", $op, $A ) )
 				return null;
@@ -1099,7 +1134,6 @@
 
 		public static function ecdh_size( $server )
 		{
-			// "true | openssl s_client -connect mainpresswiki.nl:443 -servername www.mainpresswiki.nl -msg -cipher 'DH' 2>&1 | grep '0c 00 03 0b .. ..'"
 			$op = self::s_client( $server, array( "*ECDH" ) );
 			if ( preg_match( "/ServerKeyExchange\\n\\s+0c .. .. .. 03 ((..) (..))/muis", $op, $A ) )
 			{
