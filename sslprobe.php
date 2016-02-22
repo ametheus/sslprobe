@@ -1082,6 +1082,9 @@
 			if ( is_array($ciphers) )
 				$cc = "-cipher " . escapeshellarg(implode(":",array_map('SSLinfo::cipher_name',$ciphers)) . ":+HIGH:+MEDIUM:+LOW:+RC4:+MD5");
 
+			list($servername) = explode( ":", $host );
+			$servername = escapeshellarg( $servername );
+
 			$host = escapeshellarg( $host );
 
 			$prt = [];
@@ -1093,7 +1096,7 @@
 			$prt = implode( " ", $prt );
 
 			$openssl = self::$openssl;
-			return shell_exec( "true | {$openssl} s_client -msg -prexit {$prt} {$cc} -connect {$host} 2>&1" );
+			return shell_exec( "true | {$openssl} s_client -msg -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
 		}
 
 		public static function connect( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
