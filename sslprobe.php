@@ -1274,6 +1274,8 @@
 
 			if ( empty($s) )
 				return null;
+			if ( is_numeric($s) && $s == 0 )
+				return null;
 
 			foreach ( self::$map as $name => $info )
 			{
