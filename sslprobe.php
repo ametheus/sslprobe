@@ -1239,32 +1239,153 @@
 			return "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($der),76,"\n") . "-----END CERTIFICATE-----";
 		}
 
+		private static function x509_parse( $der )
+		{
+			$pem = self::der2pem( $der );
+			$cert = openssl_x509_parse( $pem );
+
+			$arr = self::asn1_parse( $der );
+			$cert["raw_structure"] = $arr;
+			$asn_cert = [
+				"certificate" => [
+					"version_number"            => $arr[0][0],
+					"serial_number"             => $arr[0][1],
+					"signature_algorithm id"    => $arr[0][2],
+					"issuer_name"               => $arr[0][3],
+					"validity_period"           => $arr[0][4],
+					"subject_name"              => $arr[0][5],
+					"subject_public_key_info"   => [
+						"public_key_algorithm"      => $arr[0][6][0],
+						"subject_public_key"        => $arr[0][6][1],
+					],
+					"issuer_unique_identifier"  => null,
+					"subject_unique_identifier" => null,
+					"extensions"                => null,
+				],
+				"certificate_signature_algorithm" => $arr[1],
+				"certificate_signature_value" => $arr[2],
+			];
+
+			foreach ( $arr[0] as $i => $field )
+			{
+				if ( $i < 7 )  continue;
+				if ( $field["type"] != "cont" )  continue;
+
+				if ( $field["tag"] == 1 )  $asn_cert["certificate"]["issuer_unique_identifier"] = $field;
+				if ( $field["tag"] == 2 )  $asn_cert["certificate"]["subject_unique_identifier"] = $field;
+				if ( $field["tag"] == 3 )  $asn_cert["certificate"]["extensions"] = $field;
+			}
+
+			$cert["public_key"] = [
+				"algorithm" => $asn_cert["certificate"]["subject_public_key_info"]["public_key_algorithm"][0],
+				"parameters" => $asn_cert["certificate"]["subject_public_key_info"]["public_key_algorithm"][1],
+				"raw_key" => $asn_cert["certificate"]["subject_public_key_info"]["subject_public_key"],
+			];
+
+			$cert["signature"] = [
+				"algorithm" => $asn_cert["certificate_signature_algorithm"][0],
+				"value" => $asn_cert["certificate_signature_value"],
+			];
+
+			return $cert;
+		}
+
+		private static function asn1_parse( $der )
+		{
+			$asn1 = self::call_openssl( "asn1parse -inform der", $der );
+			$rv = [];
+			$lines = explode( "\n", $asn1 );
+			foreach ( $lines as $line )
+			{
+				if ( strlen($line) == 0 )  continue;
+				if ( !preg_match( "/^\s*(\d+):d=\s*(\d+)\s+hl=\s*(\d+)\s+l=\s*(\d+)\s+(cons|prim):\s+" .
+						"([A-Za-z0-9 ]+)" .
+						"(\s*\[ (\d+) \])?\s*" .
+						"(\[HEX DUMP\])?" .
+						"(:\s*(.+))?$/", $line, $A ) )
+				{
+					print( "{$line}\n" );
+					exit(1);
+				}
+				@list(,$offset,$depth,$header_length,$length,$cp,$type,,$tag,,,$contents) = $A;
+				$type = trim($type);
+				if ( $depth == 0 )
+				{
+					if ( $type != "SEQUENCE" )
+						$rv["type"] = $type;
+
+					if ( $type == "OBJECT" )
+						return $contents;
+					if ( $type == "NULL" )
+						return null;
+
+					if ( strlen($tag) )
+						$rv["tag"] = $tag;
+
+					if ( $type == "OCTET STRING" || $type == "BIT STRING" )
+						return substr($der, $offset + $header_length, $length );
+					elseif ( strlen(trim($contents)) )
+						return $contents;
+				}
+				if ( $depth == 1 )
+					$rv[] = self::asn1_parse( substr($der, $offset, $length + $header_length) );
+			}
+			return $rv;
+		}
+
 		private static function x509_fingerprint( $file )
 		{
 			$pem = file_get_contents($file);
 			return sha1( self::pem2der( $pem ) );
 		}
 
-		private static function x509_pubkey( $pem )
+		private static function x509_pubkey( $der )
 		{
-			$out = self::call_openssl( "x509 -noout -pubkey", $pem );
+			$out = self::call_openssl( "x509 -noout -pubkey -inform der", $der );
 			return self::pem2der( $out );
 		}
 
 		public static function format_certificate( $der )
 		{
-			$pem = self::der2pem( $der );
-			$cert = openssl_x509_parse( $pem );
+			$cert = self::x509_parse( $der );
 			if ( !$cert )  return bred("error") . "\n{$pem}";
 
 			$trusted = false;
-			$pubkey = self::x509_pubkey( $pem );
+			$pubkey = self::x509_pubkey( $der );
 			$fpr = sha1($der);
 			$cd = glob("/etc/ssl/certs/{$cert["hash"]}.*");
 			foreach ( $cd as $c )
 			{
-				if ( self::x509_pubkey(file_get_contents($c)) === $pubkey )
+				if ( self::x509_pubkey(self::pem2der(file_get_contents($c))) === $pubkey )
 					$trusted = true;
+			}
+
+			$keytype = "???";
+			$keybits = 0;
+			$enoughbits = "blue";
+
+			if ( $cert["public_key"]["algorithm"] == "id-ecPublicKey" )
+			{
+				$keytype = "ECC";
+				if ( preg_match( "/^[a-z]+(\d+)/i", $cert["public_key"]["parameters"], $A ) )
+				{
+					$keybits = (int)$A[1];
+					$enoughbits = "green";
+				}
+			}
+			elseif ( $cert["public_key"]["algorithm"] == "rsaEncryption" )
+			{
+				$keytype = "RSA";
+				list($modulus,$exponent) = self::asn1_parse( substr($cert["public_key"]["raw_key"],1) );
+				$keybits = strlen($modulus) * 4;
+				$enoughbits = "bred";
+				if ( $keybits > 1500 ) $enoughbits = "red";
+				if ( $keybits > 2000 ) $enoughbits = "yellow";
+				if ( $keybits > 3000 ) $enoughbits = "green";
+			}
+			else
+			{
+				$keytype = "?? " . $cert["public_key"]["algorithm"];
 			}
 
 			return
@@ -1272,6 +1393,9 @@
 				( strlen($cert["subject"]["CN"]) > 25 ? "..." : "   " ) .
 				" " .
 				( $trusted ? green("T") : " " ) .
+				" " .
+				" {$keytype} " .
+				$enoughbits( sprintf("%-5d", $keybits ) ) .
 				" " .
 				bblack(substr($fpr,0,16));
 		}
