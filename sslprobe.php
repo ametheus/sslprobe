@@ -1132,10 +1132,17 @@
 			if ( is_array($ciphers) )
 				$cc = "-cipher " . escapeshellarg(implode(":",array_map('SSLinfo::cipher_name',$ciphers)) . ":+HIGH:+MEDIUM:+LOW:+RC4:+MD5");
 
-			list($servername) = explode( ":", $host );
+			list($servername,$port) = explode( ":", $host );
 			$servername = escapeshellarg( $servername );
 
 			$host = escapeshellarg( $host );
+
+			$starttls = "";
+			if ( $port == 25 || $port == 587 )  $starttls = "-starttls smtp";
+			elseif ( $port == 110 )             $starttls = "-starttls pop3";
+			elseif ( $port == 143 )             $starttls = "-starttls imap";
+			elseif ( $port == 21 )              $starttls = "-starttls ftp";
+			elseif ( $port == 6667 )            $starttls = "-starttls irc";
 
 			$prt = [];
 			if ( !$protos["SSL3"]  ) $prt[] = "-no_ssl3";
@@ -1145,7 +1152,7 @@
 
 			$prt = implode( " ", $prt );
 
-			return self::call_openssl( "s_client -msg -showcerts -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
+			return self::call_openssl( "s_client -msg -showcerts -prexit {$prt} {$cc} -connect {$host} -servername {$servername} {$starttls} 2>&1" );
 		}
 
 		public static function connect( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
