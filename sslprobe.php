@@ -16,6 +16,7 @@
 
 	print( "Protocol support:" );
 
+	$found = false;
 	$protos = array( "SSL3" => false, "TLS10" => false, "TLS11" => false, "TLS12" => false );
 	$server_protocols = array();
 	foreach ( $protos as $p => $k )
@@ -32,12 +33,33 @@
 			if ( substr($p,0,3) == "SSL" )  print( bred( $p ) );
 			elseif ( $p === "TLS12" )       print( bgreen( $p ) );
 			else print( green( $p ) );
+			$found = true;
 		}
 		else
 			print( bblack( $p ) );
 	}
 	print( "\n\n" );
 
+	if ( !$found )
+		exit(1);
+
+	print( "Certificate chains:\n" );
+	$certchains = SSLinfo::certificate_chains( $server );
+	foreach ( $certchains as $auth => $chain )
+	{
+		printf( "  %-5s ", $auth );
+		if ( !$chain || count($chain) == 0 )
+		{
+			print( bblack( "none" ) . "\n" );
+			continue;
+		}
+		foreach ( $chain as $i => $cert )
+		{
+			if ( $i )  printf( "  %5s ", "" );
+			print( SSLinfo::format_certificate($cert) . "\n" );
+		}
+	}
+	print( "\n" );
 
 	print( "Browser ciphers:\n" );
 
@@ -1100,7 +1122,7 @@
 			$prt = implode( " ", $prt );
 
 			$openssl = self::$openssl;
-			return shell_exec( "true | {$openssl} s_client -msg -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
+			return shell_exec( "true | {$openssl} s_client -msg -showcerts -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
 		}
 
 		public static function connect( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
@@ -1156,6 +1178,94 @@
 			// TODO: non-named curves
 
 			return null;
+		}
+
+		public static function certificate_chains( $server )
+		{
+			$rv = [];
+			foreach ( [ "RSA", "ECDSA" ] as $signing_alg )
+			{
+				$rv[$signing_alg] = null;
+				$op = self::s_client( $server, [ "*a{$signing_alg}" ] );
+				if ( ($a = strpos($op,"SSL-Session:")) === false ) continue;
+				$op = substr( $op, 0, $a );
+
+				preg_match_all( "/-+BEGIN CERTIFICATE-+([^-]+)-+END CERTIFICATE-+/", $op, $A );
+				$rv[$signing_alg] = [];
+				foreach ( $A[1] as $cert )
+				{
+					$cert = base64_decode(trim($cert));
+					$rv[$signing_alg][] = $cert;
+				}
+			}
+			return $rv;
+		}
+
+		private static function pem2der( $pem )
+		{
+			$lines = array_map("trim",explode("\n", $pem));
+			array_shift($lines);
+			$line = "";
+			while ( empty(trim($line)) )
+				$line = array_pop($lines);
+			$pem = implode("\n",$lines);
+			return base64_decode($pem);
+		}
+		private static function der2pem( $der )
+		{
+			return "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($der),76,"\n") . "-----END CERTIFICATE-----";
+		}
+
+		private static function x509_fingerprint( $file )
+		{
+			$pem = file_get_contents($file);
+			return sha1( self::pem2der( $pem ) );
+		}
+
+		private static function x509_pubkey( $pem )
+		{
+			if ( !isset(self::$openssl) )  self::init_though();
+			$fds = [
+				0 => [ "pipe", "r" ],
+				1 => [ "pipe", "w" ],
+			];
+
+			$proc = proc_open( self::$openssl . " x509 -noout -pubkey", $fds, $pipes );
+			if ( !is_resource( $proc ) )  return null;
+
+			fwrite( $pipes[0], $pem );
+			fclose( $pipes[0] );
+
+			$out = stream_get_contents( $pipes[1] );
+			fclose( $pipes[1] );
+			proc_close( $proc );
+
+			return self::pem2der( $out );
+		}
+
+		public static function format_certificate( $der )
+		{
+			$pem = self::der2pem( $der );
+			$cert = openssl_x509_parse( $pem );
+			if ( !$cert )  return bred("error") . "\n{$pem}";
+
+			$trusted = false;
+			$pubkey = self::x509_pubkey( $pem );
+			$fpr = sha1($der);
+			$cd = glob("/etc/ssl/certs/{$cert["hash"]}.*");
+			foreach ( $cd as $c )
+			{
+				if ( self::x509_pubkey(file_get_contents($c)) === $pubkey )
+					$trusted = true;
+			}
+
+			return
+				sprintf("%-25s", substr($cert["subject"]["CN"],0,25)) .
+				( strlen($cert["subject"]["CN"]) > 25 ? "..." : "   " ) .
+				" " .
+				( $trusted ? green("T") : " " ) .
+				" " .
+				bblack(substr($fpr,0,16));
 		}
 
 		public static function server_probe( $server, $protocol = "TLS10" )
