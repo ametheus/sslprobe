@@ -1091,16 +1091,40 @@
 
 		public static function openssl_version()
 		{
-			if ( !isset(self::$openssl) )  self::init_though();
+			return trim( self::call_openssl( "version" ) );
+		}
 
-			$openssl = self::$openssl;
-			return trim( shell_exec( "{$openssl} version" ) );
+		private static function call_openssl( $cmd, $in = "", &$exit_status = null, $infiles = [] )
+		{
+			if ( !isset(self::$openssl) )  self::init_though();
+			$fds = [
+				0 => [ "pipe", "r" ],
+				1 => [ "pipe", "w" ],
+			];
+			foreach ( $infiles as $id => $contents )
+				$fds[$id] = [ "pipe", "r" ];
+
+			$proc = proc_open( self::$openssl . " " . $cmd, $fds, $pipes );
+			if ( !is_resource( $proc ) )  return null;
+
+			fwrite( $pipes[0], $in );
+			fclose( $pipes[0] );
+
+			foreach ( $infiles as $id => $contents )
+			{
+				fwrite( $pipes[$id], $contents );
+				fclose( $pipes[$id] );
+			}
+
+			$out = stream_get_contents( $pipes[1] );
+			fclose( $pipes[1] );
+			$exit_status = proc_close( $proc );
+
+			return $out;
 		}
 
 		protected static function s_client( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
 		{
-			if ( !isset(self::$openssl) )  self::init_though();
-
 			if ( is_string($ciphers) )
 				$ciphers = [ $ciphers ];
 
@@ -1121,8 +1145,7 @@
 
 			$prt = implode( " ", $prt );
 
-			$openssl = self::$openssl;
-			return shell_exec( "true | {$openssl} s_client -msg -showcerts -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
+			return self::call_openssl( "s_client -msg -showcerts -prexit {$prt} {$cc} -connect {$host} -servername {$servername} 2>&1" );
 		}
 
 		public static function connect( $host, $ciphers, $protos = array( "SSL2" => true, "SSL3" => true, "TLS10" => true, "TLS11" => true, "TLS12" => true ) )
@@ -1224,22 +1247,7 @@
 
 		private static function x509_pubkey( $pem )
 		{
-			if ( !isset(self::$openssl) )  self::init_though();
-			$fds = [
-				0 => [ "pipe", "r" ],
-				1 => [ "pipe", "w" ],
-			];
-
-			$proc = proc_open( self::$openssl . " x509 -noout -pubkey", $fds, $pipes );
-			if ( !is_resource( $proc ) )  return null;
-
-			fwrite( $pipes[0], $pem );
-			fclose( $pipes[0] );
-
-			$out = stream_get_contents( $pipes[1] );
-			fclose( $pipes[1] );
-			proc_close( $proc );
-
+			$out = self::call_openssl( "x509 -noout -pubkey", $pem );
 			return self::pem2der( $out );
 		}
 
