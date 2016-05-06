@@ -1290,12 +1290,15 @@
 			return $cert;
 		}
 
-		private static function asn1_parse( $der )
+		private static function asn1_parse( $der, $lines = null, $target_depth = 0 )
 		{
-			$asn1 = self::call_openssl( "asn1parse -inform der", $der );
-			$rv = [];
-			$lines = explode( "\n", $asn1 );
-			foreach ( $lines as $line )
+			if ( !is_array($lines) )
+			{
+				$asn1 = self::call_openssl( "asn1parse -inform der", $der );
+				$rv = [];
+				$lines = explode( "\n", $asn1 );
+			}
+			foreach ( $lines as $lineno => $line )
 			{
 				if ( strlen($line) == 0 )  continue;
 				if ( !preg_match( "/^\s*(\d+):d=\s*(\d+)\s+hl=\s*(\d+)\s+l=\s*(\d+)\s+(cons|prim):\s+" .
@@ -1309,7 +1312,7 @@
 				}
 				@list(,$offset,$depth,$header_length,$length,$cp,$type,,$tag,,,$contents) = $A;
 				$type = trim($type);
-				if ( $depth == 0 )
+				if ( ($depth-$target_depth) == 0 )
 				{
 					if ( $type != "SEQUENCE" )
 						$rv["type"] = $type;
@@ -1327,8 +1330,19 @@
 					elseif ( strlen(trim($contents)) )
 						return $contents;
 				}
-				if ( $depth == 1 )
-					$rv[] = self::asn1_parse( substr($der, $offset, $length + $header_length) );
+				if ( ($depth-$target_depth) == 1 )
+				{
+					$child = [ $line ];
+					for ( $i = $lineno + 1; $i < count($lines); $i++ )
+					{
+						$ll = $lines[$i];
+						if ( strlen($ll) == 0 )  continue;
+						if ( !preg_match( "/^\s*(\d+):d=\s*(\d+)/", $ll, $A ) )   { print( "{$ll}\n" ); exit(1); }
+						if ( $A[2] <= ($target_depth+1) )  break;
+						$child[] = $ll;
+					}
+					$rv[] = self::asn1_parse( $der, $child, $target_depth + 1 );
+				}
 			}
 			return $rv;
 		}
