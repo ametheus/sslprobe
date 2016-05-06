@@ -3,6 +3,10 @@
 	chdir( __DIR__ );
 	
 	$server = $argv[1];
+	@list($servername,$port) = explode(":",$server);
+	if ( (int)$port < 10 )  $port = @$argv[2];
+	if ( (int)$port < 10 )  $port = 443;
+	$server = "{$servername}:{$port}";
 
 	require_once( "termcolours.inc" );
 
