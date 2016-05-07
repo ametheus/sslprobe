@@ -52,12 +52,28 @@ func SupportedProtocols(host string, port int) []supportedProtocol {
 }
 
 func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
-	rv = TLS_NULL
+	serverHello, _, _, err := HalfHandshake(host, port, version, ciphers)
+	if err != nil {
+		return
+	}
+	sess_l := int(serverHello[34])
+	rv = Lookup(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+	tls_version = TLSVersion(uint16(serverHello[0])<<8 | uint16(serverHello[1]))
+	return
+}
+
+func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
 	var c net.Conn
 	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		return
 	}
+
+	// Be polite - send a fatal alert before hanging up
+	defer func() {
+		c.Write([]byte{21, byte(uint(version) >> 8), byte(uint(version)), 0, 2, 2, 0})
+		c.Close()
+	}()
 
 	serverName := []byte(host)
 	extension_length := 2 + 2 + 2 + 3 + len(serverName)
@@ -107,23 +123,45 @@ func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (r
 		return
 	}
 
-	serverHello, err := ReadNext(c)
+	hstype, serverHello, err := NextHandshake(c)
 	if err != nil {
+		serverHello = nil
 		return
 	}
-
-	if serverHello[0] != 22 || serverHello[5] != 2 {
+	if hstype != 2 {
+		serverHello = nil
 		err = fmt.Errorf("Was expecting a ServerHello.")
 		return
 	}
-	tls_version = TLSVersion(uint16(serverHello[9])<<8 | uint16(serverHello[10]))
-	sess_l := int(serverHello[43])
-	cipher := uint16(serverHello[44+sess_l])<<8 | uint16(serverHello[45+sess_l])
-	rv = Lookup(cipher)
 
-	// Be polite - send a fatal alert before hanging up
-	c.Write([]byte{21, byte(uint(version) >> 8), byte(uint(version)), 0, 2, 2, 0})
-	c.Close()
+	sess_l := int(serverHello[34])
+	cipher := Lookup(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+
+	if cipher.Auth == AU_RSA || cipher.Auth == AU_DSA || cipher.Auth == AU_ECDSA {
+		hstype, serverCertificate, err = NextHandshake(c)
+		if err != nil {
+			serverCertificate = nil
+			return
+		}
+		if hstype != 11 {
+			serverCertificate = nil
+			err = fmt.Errorf("Was expecting a Certificate")
+			return
+		}
+	}
+
+	if cipher.Kex == KX_ECDHE || cipher.Kex == KX_FFDHE {
+		hstype, serverKeyExchange, err = NextHandshake(c)
+		if err != nil {
+			serverKeyExchange = nil
+			return
+		}
+		if hstype != 12 {
+			serverKeyExchange = nil
+			err = fmt.Errorf("Was expecting a ServerKeyExchange")
+			return
+		}
+	}
 
 	return
 }
@@ -139,7 +177,9 @@ func pint3(target []byte, source int) {
 	target[2] = byte(source & 255)
 }
 
-func ReadNext(c net.Conn) ([]byte, error) {
+var ERR_UnexpectedContentType error = fmt.Errorf("Unexpected ContentType")
+
+func ReadCapsule(c net.Conn, expectedContentType byte) ([]byte, error) {
 	lb := make([]byte, 5)
 	_, err := c.Read(lb)
 	if err != nil {
@@ -147,17 +187,46 @@ func ReadNext(c net.Conn) ([]byte, error) {
 	}
 
 	length := (int(lb[3]) << 8) | int(lb[4])
-	rv := make([]byte, 5+length)
-	copy(rv, lb)
-	_, err = c.Read(rv[5:])
+	rv := make([]byte, length)
+	_, err = c.Read(rv)
 	if err != nil {
 		return nil, err
 	}
 
-	if rv[0] == 21 {
+	if lb[0] == 21 {
 		// This is a TLS alert, and therefore probably an error
-		return nil, Alert{rv[5], rv[6]}
+		return nil, Alert{rv[0], rv[1]}
+	} else if lb[0] != expectedContentType {
+		return nil, ERR_UnexpectedContentType
 	}
 
 	return rv, nil
+}
+
+var hsbuf []byte = []byte{}
+
+func NextHandshake(c net.Conn) (byte, []byte, error) {
+	for len(hsbuf) < 4 {
+		nb, err := ReadCapsule(c, 22)
+		if err != nil {
+			return 0, nil, err
+		}
+		hsbuf = append(hsbuf, nb...)
+	}
+	hstype := hsbuf[0]
+	expected_length := int(hsbuf[1])<<16 | int(hsbuf[2])<<8 | int(hsbuf[3])
+	for len(hsbuf) < expected_length+4 {
+		nb, err := ReadCapsule(c, 22)
+		if err != nil {
+			return 0, nil, err
+		}
+		hsbuf = append(hsbuf, nb...)
+	}
+
+	rv := make([]byte, expected_length)
+	copy(rv, hsbuf[4:4+expected_length])
+	nb := make([]byte, len(hsbuf)-expected_length-4)
+	copy(nb, hsbuf[4+expected_length:])
+	hsbuf = nb
+	return hstype, rv, nil
 }
