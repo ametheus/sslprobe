@@ -474,3 +474,93 @@ func Lookup(id uint16) CipherInfo {
 	}
 	return TLS_NULL
 }
+
+type CurveInfo struct {
+	ID   uint16
+	Name string
+	EC   bool
+	Bits uint16
+}
+
+var Curve_NULL CurveInfo = CurveInfo{0, "null", false, 0}
+var AllCurves []CurveInfo = []CurveInfo{
+	CurveInfo{1, "sect163k1", true, 163},
+	CurveInfo{2, "sect163r1", true, 163},
+	CurveInfo{3, "sect163r2", true, 163},
+	CurveInfo{4, "sect193r1", true, 193},
+	CurveInfo{5, "sect193r2", true, 193},
+	CurveInfo{6, "sect233k1", true, 233},
+	CurveInfo{7, "sect233r1", true, 233},
+	CurveInfo{8, "sect239k1", true, 239},
+	CurveInfo{9, "sect283k1", true, 283},
+	CurveInfo{10, "sect283r1", true, 283},
+	CurveInfo{11, "sect409k1", true, 409},
+	CurveInfo{12, "sect409r1", true, 409},
+	CurveInfo{13, "sect571k1", true, 571},
+	CurveInfo{14, "sect571r1", true, 571},
+	CurveInfo{15, "secp160k1", true, 160},
+	CurveInfo{16, "secp160r1", true, 160},
+	CurveInfo{17, "secp160r2", true, 160},
+	CurveInfo{18, "secp192k1", true, 192},
+	CurveInfo{19, "secp192r1", true, 192},
+	CurveInfo{20, "secp224k1", true, 224},
+	CurveInfo{21, "secp224r1", true, 224},
+	CurveInfo{22, "secp256k1", true, 256},
+	CurveInfo{23, "secp256r1", true, 256},
+	CurveInfo{24, "secp384r1", true, 384},
+	CurveInfo{25, "secp521r1", true, 521},
+	CurveInfo{26, "brainpoolP256r1", true, 256},
+	CurveInfo{27, "brainpoolP384r1", true, 384},
+	CurveInfo{28, "brainpoolP512r1", true, 512},
+	CurveInfo{29, "temp_curve25519", true, 256},
+	CurveInfo{30, "temp_curve448", true, 448},
+	CurveInfo{256, "ffdhe2048", false, 2048},
+	CurveInfo{257, "ffdhe3072", false, 3072},
+	CurveInfo{258, "ffdhe4096", false, 4096},
+	CurveInfo{259, "ffdhe6144", false, 6144},
+	CurveInfo{260, "ffdhe8192", false, 8192},
+	CurveInfo{65281, "arbitrary_explicit_prime_curve", true, 0},
+	CurveInfo{65282, "arbitrary_explicit_char2_curve", true, 0}}
+
+func IDCurve(id uint16) CurveInfo {
+	for _, c := range AllCurves {
+		if c.ID == id {
+			return c
+		}
+	}
+	return Curve_NULL
+}
+
+// Return the equivalent DH bit strength
+func (c CurveInfo) DHBits() int {
+	// Lagrange interpolation of the NIST recommendation table:
+	//  160  →   1024
+	//  224  →   2048
+	//  256  →   3072
+	//  384  →   7680
+	//  521  →  15360
+
+	if !c.EC {
+		return int(c.Bits)
+	}
+
+	b := float64(c.Bits)
+	return int(2.2247113318292543e-06*(b*b*b*b) - 0.002910544879983633*(b*b*b) + 1.4166053052358345*(b*b) - 267.8476746244936*b + 18078.137135866877)
+}
+
+// Return the equivalent Symmetric cipher strength
+func (c CurveInfo) SymBits() int {
+	if !c.EC {
+		panic("TODO: Find a NIST recommendation table for this equivalency, and also find my Lagrange interpolation script.")
+	} else {
+		// Lagrange interpolation of the NIST recommendation table:
+		//  160  →  80
+		//  224  →  112
+		//  256  →  128
+		//  384  →  192
+		//  521  →  256
+
+		b := float64(c.Bits)
+		return int(1.1838110189986005e-06*(b*b*b) - 0.0004391938880483129*(b*b) + 0.5701573762299863*b - 4.073067544406371)
+	}
+}

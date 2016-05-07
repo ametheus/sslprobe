@@ -86,16 +86,39 @@ func main() {
 			}
 			if serverKeyExchange != nil {
 				dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
-				col = tc.Bred
-				if dh_len*8 > 2048 {
-					col = tc.Green
-				} else if dh_len*8 > 1536 {
-					col = tc.Yellow
-				} else if dh_len*8 > 1024 {
-					col = tc.Red
-				}
+				col = cStrength(dh_len * 8)
 				fmt.Printf("DH Modulus size: %5s bits\n", col(fmt.Sprintf("%d", dh_len*8)))
 			}
 		}
+		if f_ecdhe.ID != 0 {
+			_, _, serverKeyExchange, err := sslprobe.HalfHandshake(host, port, max_version, []sslprobe.CipherInfo{f_ecdhe})
+			if err != nil {
+				panic(err)
+			}
+			if serverKeyExchange != nil {
+				if serverKeyExchange[0] == 3 {
+					// Named Curve - whew!
+					id := uint16(serverKeyExchange[1])<<8 | uint16(serverKeyExchange[2])
+					curve := sslprobe.IDCurve(id)
+					dlen := curve.DHBits()
+					col = cStrength(dlen)
+					fmt.Printf("Preferred Curve: %s (%d bits, eq %s bits DH)\n", col(curve.Name), curve.Bits, col(fmt.Sprintf("%d", dlen)))
+				} else {
+					panic("Don't quite know how to handle this curve encoding")
+				}
+			}
+		}
+	}
+}
+
+func cStrength(bits int) func(string) string {
+	if bits > 2048 {
+		return tc.Green
+	} else if bits > 1536 {
+		return tc.Yellow
+	} else if bits > 1024 {
+		return tc.Red
+	} else {
+		return tc.Bred
 	}
 }
