@@ -13,8 +13,8 @@ func CipherPreference(host string, port int, version TLSVersion) []CipherInfo {
 	candidates := 0
 
 	for candidates < maxl {
-		ciph, _ := Connect(host, port, version, rv[candidates:])
-		if ciph.ID != 0x0000 {
+		ciph, vv, _ := Connect(host, port, version, rv[candidates:])
+		if ciph.ID != 0x0000 && vv == version {
 			for i, c := range rv {
 				if i <= candidates {
 					continue
@@ -35,7 +35,23 @@ func CipherPreference(host string, port int, version TLSVersion) []CipherInfo {
 	return rv[0:candidates]
 }
 
-func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, err error) {
+type supportedProtocol struct {
+	Version   TLSVersion
+	Supported bool
+}
+
+func SupportedProtocols(host string, port int) []supportedProtocol {
+	rv := make([]supportedProtocol, 0, 6)
+	all := []TLSVersion{SSL_2_0, SSL_3_0, TLS_1_0, TLS_1_1, TLS_1_2, TLS_1_3}
+
+	for _, v := range all {
+		cph, vv, _ := Connect(host, port, v, AllCiphers)
+		rv = append(rv, supportedProtocol{v, cph.ID != 0x0000 && v == vv})
+	}
+	return rv
+}
+
+func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
 	rv = TLS_NULL
 	var c net.Conn
 	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
@@ -100,6 +116,7 @@ func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (r
 		err = fmt.Errorf("Was expecting a ServerHello.")
 		return
 	}
+	tls_version = TLSVersion(uint16(serverHello[9])<<8 | uint16(serverHello[10]))
 	sess_l := int(serverHello[43])
 	cipher := uint16(serverHello[44+sess_l])<<8 | uint16(serverHello[45+sess_l])
 	rv = Lookup(cipher)

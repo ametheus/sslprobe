@@ -1,5 +1,9 @@
 package sslprobe
 
+import (
+	"fmt"
+)
+
 type TLSVersion uint16
 
 const (
@@ -12,6 +16,27 @@ const (
 	TLS_1_3             = 0x0304
 	TLS_1_99            = 0x03ff
 )
+
+func (v TLSVersion) String() string {
+	if v == SSL_2_0 {
+		return "SSL2"
+	} else if v == SSL_3_0 {
+		return "SSL3"
+	} else if v == TLS_1_0 {
+		return "TLS1.0"
+	} else if v == TLS_1_1 {
+		return "TLS1.1"
+	} else if v == TLS_1_2 {
+		return "TLS1.2"
+	} else if v == TLS_1_3 {
+		return "TLS1.3"
+	} else if v == SSL_2_99 {
+		return "SSL2.99"
+	} else if v == TLS_1_99 {
+		return "TLS1.99"
+	}
+	return fmt.Sprintf("SSLVersion 0x%04x", uint16(v))
+}
 
 type CipherInfo struct {
 	ID     uint16
