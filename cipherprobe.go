@@ -6,6 +6,35 @@ import (
 	"net"
 )
 
+func CipherPreference(host string, port int, version TLSVersion) []CipherInfo {
+	maxl := len(AllCiphers)
+	rv := make([]CipherInfo, maxl)
+	copy(rv, AllCiphers)
+	candidates := 0
+
+	for candidates < maxl {
+		ciph, _ := Connect(host, port, version, rv[candidates:])
+		if ciph.ID != 0x0000 {
+			for i, c := range rv {
+				if i <= candidates {
+					continue
+				}
+				if c.ID == ciph.ID {
+					for j := i; j > candidates; j-- {
+						rv[j] = rv[j-1]
+					}
+					rv[candidates] = ciph
+					break
+				}
+			}
+			candidates++
+		} else {
+			break
+		}
+	}
+	return rv[0:candidates]
+}
+
 func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, err error) {
 	rv = TLS_NULL
 	var c net.Conn
@@ -73,7 +102,6 @@ func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (r
 	}
 	sess_l := int(serverHello[43])
 	cipher := uint16(serverHello[44+sess_l])<<8 | uint16(serverHello[45+sess_l])
-	fmt.Printf("Cipher: 0x%04x\n", cipher)
 	rv = Lookup(cipher)
 
 	// Be polite - send a fatal alert before hanging up
