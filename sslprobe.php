@@ -134,7 +134,7 @@
 			{
 				print( "   " . SSLinfo::format_cipher($cc) . "\n" );
 			}
-			if ( !in_array( "--quick", $argv ) )
+			if ( in_array( "--quick", $argv ) )
 			{
 				break;
 			}
