@@ -61,8 +61,16 @@ func (a Alert) Error() string {
 		message = "no_renegotiation"
 	} else if a.Description == 110 {
 		message = "unsupported_extension"
+	} else if a.Description == 111 {
+		message = "certificate_unobtainable"
 	} else if a.Description == 112 {
 		message = "unrecognized_name"
+	} else if a.Description == 113 {
+		message = "bad_certificate_status_response"
+	} else if a.Description == 114 {
+		message = "bad_certificate_hash_value"
+	} else if a.Description == 115 {
+		message = "unknown_psk_identity"
 	}
 	return fmt.Sprintf("TLS Alert, severity %d: %s", a.Level, message)
 }
