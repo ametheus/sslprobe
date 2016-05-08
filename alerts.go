@@ -61,6 +61,8 @@ func (a Alert) Error() string {
 		message = "no_renegotiation"
 	} else if a.Description == 110 {
 		message = "unsupported_extension"
+	} else if a.Description == 112 {
+		message = "unrecognized_name"
 	}
 	return fmt.Sprintf("TLS Alert, severity %d: %s", a.Level, message)
 }

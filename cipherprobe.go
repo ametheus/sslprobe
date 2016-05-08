@@ -126,7 +126,21 @@ func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherIn
 	hstype, serverHello, err := NextHandshake(c)
 	if err != nil {
 		serverHello = nil
-		return
+		if alert, ok := err.(Alert); ok {
+			// Ignore 'unrecognized name' warnings.
+			if alert.Level == 1 && alert.Description == 112 {
+				fmt.Printf("  ignored: %s\n", alert)
+				hstype, serverHello, err = NextHandshake(c)
+				if err != nil {
+					serverHello = nil
+					return
+				}
+			} else {
+				return
+			}
+		} else {
+			return
+		}
 	}
 	if hstype != 2 {
 		serverHello = nil
