@@ -6,14 +6,25 @@ import (
 	"net"
 )
 
-func CipherPreference(host string, port int, version TLSVersion) []CipherInfo {
+type Probe struct {
+	Host string
+	Port int
+}
+
+func New(host string, port int) *Probe {
+	rv := &Probe{host, port}
+	// TODO: perform all tests here rather than in main()
+	return rv
+}
+
+func (p *Probe) CipherPreference(version TLSVersion) []CipherInfo {
 	maxl := len(AllCiphers)
 	rv := make([]CipherInfo, maxl)
 	copy(rv, AllCiphers)
 	candidates := 0
 
 	for candidates < maxl {
-		ciph, vv, _ := Connect(host, port, version, rv[candidates:])
+		ciph, vv, _ := p.Connect(version, rv[candidates:])
 		if ciph.ID != 0x0000 && vv == version {
 			for i, c := range rv {
 				if i <= candidates {
@@ -40,19 +51,19 @@ type supportedProtocol struct {
 	Supported bool
 }
 
-func SupportedProtocols(host string, port int) []supportedProtocol {
+func (p *Probe) SupportedProtocols() []supportedProtocol {
 	rv := make([]supportedProtocol, 0, 6)
 	all := []TLSVersion{SSL_2_0, SSL_3_0, TLS_1_0, TLS_1_1, TLS_1_2, TLS_1_3}
 
 	for _, v := range all {
-		cph, vv, _ := Connect(host, port, v, AllCiphers)
+		cph, vv, _ := p.Connect(v, AllCiphers)
 		rv = append(rv, supportedProtocol{v, cph.ID != 0x0000 && v == vv})
 	}
 	return rv
 }
 
-func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
-	serverHello, _, _, err := HalfHandshake(host, port, version, ciphers)
+func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
+	serverHello, _, _, err := p.HalfHandshake(version, ciphers)
 	if err != nil {
 		return
 	}
@@ -62,9 +73,9 @@ func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (r
 	return
 }
 
-func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
+func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
 	var c net.Conn
-	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
 	if err != nil {
 		return
 	}
@@ -75,7 +86,7 @@ func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherIn
 		c.Close()
 	}()
 
-	serverName := []byte(host)
+	serverName := []byte(p.Host)
 	extension_length := 2 + 2 + 2 + 3 + len(serverName)
 	clienthello_length := 46 + 2*len(ciphers) + 2 + 2 + extension_length
 

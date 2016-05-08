@@ -22,8 +22,10 @@ func main() {
 
 	fmt.Printf("Server:   %s\n", tc.Bblue(fmt.Sprintf("%s:%d", host, port)))
 
+	probe := sslprobe.New(host, port)
+
 	var max_version sslprobe.TLSVersion = 0
-	versions := sslprobe.SupportedProtocols(host, port)
+	versions := probe.SupportedProtocols()
 	fmt.Printf("Protocol support:")
 	for _, sv := range versions {
 		col = nil
@@ -59,7 +61,7 @@ func main() {
 	for _, sv := range versions {
 		if sv.Supported {
 			fmt.Printf("  %s\n", sv.Version)
-			cipher_prefs = sslprobe.CipherPreference(host, port, sv.Version)
+			cipher_prefs = probe.CipherPreference(sv.Version)
 			for _, c := range cipher_prefs {
 				fmt.Printf("     %s\n", c.Name)
 			}
@@ -80,7 +82,7 @@ func main() {
 	if f_ffdhe.ID != 0 || f_ecdhe.ID != 0 {
 		fmt.Printf("\nEphemeral Key Exchange strength\n")
 		if f_ffdhe.ID != 0 {
-			_, _, serverKeyExchange, err := sslprobe.HalfHandshake(host, port, max_version, []sslprobe.CipherInfo{f_ffdhe})
+			_, _, serverKeyExchange, err := probe.HalfHandshake(max_version, []sslprobe.CipherInfo{f_ffdhe})
 			if err != nil {
 				panic(err)
 			}
@@ -91,7 +93,7 @@ func main() {
 			}
 		}
 		if f_ecdhe.ID != 0 {
-			_, _, serverKeyExchange, err := sslprobe.HalfHandshake(host, port, max_version, []sslprobe.CipherInfo{f_ecdhe})
+			_, _, serverKeyExchange, err := probe.HalfHandshake(max_version, []sslprobe.CipherInfo{f_ecdhe})
 			if err != nil {
 				panic(err)
 			}
