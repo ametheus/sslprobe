@@ -129,7 +129,6 @@ func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherIn
 		if alert, ok := err.(Alert); ok {
 			// Ignore 'unrecognized name' warnings.
 			if alert.Level == 1 && alert.Description == 112 {
-				fmt.Printf("  ignored: %s\n", alert)
 				hstype, serverHello, err = NextHandshake(c)
 				if err != nil {
 					serverHello = nil
@@ -191,20 +190,28 @@ func pint3(target []byte, source int) {
 	target[2] = byte(source & 255)
 }
 
+var ERR_EncapsulationHeader error = fmt.Errorf("Unable to read encapsulation header")
 var ERR_UnexpectedContentType error = fmt.Errorf("Unexpected ContentType")
 
 func ReadCapsule(c net.Conn, expectedContentType byte) ([]byte, error) {
 	lb := make([]byte, 5)
-	_, err := c.Read(lb)
+	n, err := c.Read(lb)
 	if err != nil {
 		return nil, err
+	} else if n != 5 {
+		return nil, ERR_EncapsulationHeader
 	}
 
 	length := (int(lb[3]) << 8) | int(lb[4])
 	rv := make([]byte, length)
-	_, err = c.Read(rv)
-	if err != nil {
-		return nil, err
+	s := 0
+	n = 0
+	for s < length {
+		n, err = c.Read(rv[s:])
+		if err != nil {
+			return nil, err
+		}
+		s += n
 	}
 
 	if lb[0] == 21 {
