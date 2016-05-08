@@ -57,7 +57,7 @@ func Connect(host string, port int, version TLSVersion, ciphers []CipherInfo) (r
 		return
 	}
 	sess_l := int(serverHello[34])
-	rv = Lookup(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+	rv = IDCipher(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
 	tls_version = TLSVersion(uint16(serverHello[0])<<8 | uint16(serverHello[1]))
 	return
 }
@@ -135,7 +135,7 @@ func HalfHandshake(host string, port int, version TLSVersion, ciphers []CipherIn
 	}
 
 	sess_l := int(serverHello[34])
-	cipher := Lookup(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+	cipher := IDCipher(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
 
 	if cipher.Auth == AU_RSA || cipher.Auth == AU_DSA || cipher.Auth == AU_ECDSA {
 		hstype, serverCertificate, err = NextHandshake(c)

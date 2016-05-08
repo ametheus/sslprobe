@@ -463,7 +463,7 @@ var AllCiphers []CipherInfo = []CipherInfo{
 	CipherInfo{0xCC14, "LIBRESSL_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", KX_ECDHE, AU_ECDSA, SC_CHACHA20, MAC_SHA256},
 	CipherInfo{0xCC15, "LIBRESSL_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256", KX_FFDHE, AU_RSA, SC_CHACHA20, MAC_SHA256}}
 
-func Lookup(id uint16) CipherInfo {
+func IDCipher(id uint16) CipherInfo {
 	if id == 0x5600 {
 		return TLS_FALLBACK_SCSV
 	}
