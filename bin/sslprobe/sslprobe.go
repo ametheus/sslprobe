@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	tc "github.com/ametheus/go-termcolours"
-	"github.com/ametheus/sslprobe"
+	tc "github.com/thijzert/go-termcolours"
+	"github.com/thijzert/sslprobe"
 	"os"
 )
 
