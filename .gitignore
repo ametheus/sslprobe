@@ -1,3 +1,6 @@
 /openssl-latest
 /bin/custom-openssl
 /openssl-latest.tar.gz
+/rsa1024.pem
+/bin/openssl-*
+/github-openssl
