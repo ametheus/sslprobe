@@ -122,7 +122,7 @@ type CipherMACInfo struct {
 var (
 	MAC_NULL            CipherMACInfo = CipherMACInfo{"NULL", 0, false, true}
 	MAC_MD5                           = CipherMACInfo{"MD5", 128, false, true}
-	MAC_SHA1                          = CipherMACInfo{"SHA", 160, false, true}
+	MAC_SHA1                          = CipherMACInfo{"SHA", 160, false, false}
 	MAC_SHA256                        = CipherMACInfo{"SHA256", 256, false, false}
 	MAC_SHA384                        = CipherMACInfo{"SHA384", 384, false, false}
 	MAC_CCM                           = CipherMACInfo{"CCM", 128, true, false}

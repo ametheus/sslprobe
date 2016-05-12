@@ -63,7 +63,7 @@ func main() {
 			fmt.Printf("  %s\n", sv.Version)
 			cipher_prefs = probe.CipherPreference(sv.Version)
 			for _, c := range cipher_prefs {
-				fmt.Printf("     %s\n", c.Name)
+				fmt.Printf("     %s\n", FCipher(c))
 			}
 		}
 	}
@@ -123,4 +123,41 @@ func cStrength(bits int) func(string) string {
 	} else {
 		return tc.Bred
 	}
+}
+
+func FCipher(c sslprobe.CipherInfo) string {
+	var colour func(string) string = nil
+	suffix := ""
+	if c.Kex.Broken || c.Auth.Broken || c.Cipher.Broken || c.MAC.Broken {
+		colour = tc.Red
+		suffix = colour("  INSECURE")
+	} else if c.Cipher.KeySize < 112 || c.MAC.TagSize < 160 {
+		colour = tc.Yellow
+		suffix = colour("  WEAK")
+	}
+	pad := "                                              "
+
+	fs := tc.Yellow("no FS")
+	if c.Kex.ForwardSecure {
+		fs = tc.Green("  FS ")
+	}
+
+	aead := "    "
+	if c.MAC.AEAD {
+		aead = "AEAD"
+	}
+
+	cstr := fmt.Sprintf("%3d", c.Cipher.KeySize)
+	if colour == nil && c.Kex.ForwardSecure && c.Cipher.KeySize >= 128 && c.MAC.AEAD {
+		cstr = tc.Green(cstr)
+		aead = tc.Green(aead)
+	}
+
+	if colour == nil {
+		colour = func(s string) string {
+			return s
+		}
+	}
+
+	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%46:], fs, cstr, aead, suffix)
 }
