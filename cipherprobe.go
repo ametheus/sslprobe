@@ -7,17 +7,30 @@ import (
 )
 
 type Probe struct {
-	Host string
-	Port int
+	Host              string
+	Port              int
+	SupportedVersions []versionDetails
 }
 
 func New(host string, port int) *Probe {
-	rv := &Probe{host, port}
-	// TODO: perform all tests here rather than in main()
+	rv := &Probe{Host: host, Port: port}
+
+	rv.fillSupportedVersions()
+
 	return rv
 }
 
-func (p *Probe) CipherPreference(version TLSVersion) []CipherInfo {
+type versionDetails struct {
+	Version          TLSVersion
+	Supported        bool
+	SupportedCiphers []CipherInfo
+	CipherPreference bool
+	FFDHSize         int
+	SupportedCurves  []CurveInfo
+	CurvePreference  bool
+}
+
+func (p *Probe) cipherPreference(version TLSVersion) []CipherInfo {
 	maxl := len(AllCiphers)
 	rv := make([]CipherInfo, maxl)
 	copy(rv, AllCiphers)
@@ -46,20 +59,55 @@ func (p *Probe) CipherPreference(version TLSVersion) []CipherInfo {
 	return rv[0:candidates]
 }
 
-type supportedProtocol struct {
-	Version   TLSVersion
-	Supported bool
-}
-
-func (p *Probe) SupportedProtocols() []supportedProtocol {
-	rv := make([]supportedProtocol, 0, 6)
+func (p *Probe) fillSupportedVersions() {
+	p.SupportedVersions = make([]versionDetails, 0, 6)
 	all := []TLSVersion{SSL_2_0, SSL_3_0, TLS_1_0, TLS_1_1, TLS_1_2, TLS_1_3}
 
 	for _, v := range all {
 		cph, vv, _ := p.Connect(v, AllCiphers)
-		rv = append(rv, supportedProtocol{v, cph.ID != 0x0000 && v == vv})
+		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
+		if nvd.Supported {
+			nvd.SupportedCiphers = p.cipherPreference(v)
+
+			p.fillFFDHSize(&nvd)
+			p.fillCurvePreferences(&nvd)
+		}
+		p.SupportedVersions = append(p.SupportedVersions, nvd)
 	}
-	return rv
+}
+
+func (p *Probe) fillFFDHSize(vd *versionDetails) {
+	for _, c := range vd.SupportedCiphers {
+		if c.Kex != KX_FFDHE {
+			continue
+		}
+
+		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c})
+		if err == nil && serverKeyExchange != nil {
+			dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
+			vd.FFDHSize = dh_len * 8
+			return
+		}
+	}
+}
+
+func (p *Probe) fillCurvePreferences(vd *versionDetails) {
+	for _, c := range vd.SupportedCiphers {
+		if c.Kex != KX_ECDHE {
+			continue
+		}
+
+		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c})
+		if err == nil && serverKeyExchange != nil {
+			if serverKeyExchange[0] == 3 {
+				// Named Curve - whew!
+				id := uint16(serverKeyExchange[1])<<8 | uint16(serverKeyExchange[2])
+				vd.SupportedCurves = []CurveInfo{IDCurve(id)}
+			} else {
+				panic("Don't quite know how to handle this curve encoding")
+			}
+		}
+	}
 }
 
 func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {

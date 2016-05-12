@@ -25,9 +25,8 @@ func main() {
 	probe := sslprobe.New(host, port)
 
 	var max_version sslprobe.TLSVersion = 0
-	versions := probe.SupportedProtocols()
 	fmt.Printf("Protocol support:")
-	for _, sv := range versions {
+	for _, sv := range probe.SupportedVersions {
 		col = nil
 		v, s := sv.Version, sv.Supported
 		if s {
@@ -58,11 +57,14 @@ func main() {
 
 	fmt.Printf("\nCipher suites, in server-preferred order:\n")
 	var cipher_prefs []sslprobe.CipherInfo = []sslprobe.CipherInfo{}
-	for _, sv := range versions {
+	for i, _ := range probe.SupportedVersions {
+		sv := probe.SupportedVersions[len(probe.SupportedVersions)-i-1]
 		if sv.Supported {
+			if len(cipher_prefs) == 0 {
+				cipher_prefs = sv.SupportedCiphers
+			}
 			fmt.Printf("  %s\n", sv.Version)
-			cipher_prefs = probe.CipherPreference(sv.Version)
-			for _, c := range cipher_prefs {
+			for _, c := range sv.SupportedCiphers {
 				fmt.Printf("     %s\n", FCipher(c))
 			}
 		}
@@ -70,46 +72,29 @@ func main() {
 
 	// Loop over the highest protocol version's ciphers again and figure out if
 	// there's any useful information in the ServerKeyExchange
-	f_ffdhe := sslprobe.TLS_NULL
-	f_ecdhe := sslprobe.TLS_NULL
-	for _, c := range cipher_prefs {
-		if c.Kex == sslprobe.KX_FFDHE && f_ffdhe.ID == 0 {
-			f_ffdhe = c
-		} else if c.Kex == sslprobe.KX_ECDHE && f_ecdhe.ID == 0 {
-			f_ecdhe = c
+	for i, _ := range probe.SupportedVersions {
+		sv := probe.SupportedVersions[len(probe.SupportedVersions)-i-1]
+		if !sv.Supported {
+			continue
 		}
-	}
-	if f_ffdhe.ID != 0 || f_ecdhe.ID != 0 {
-		fmt.Printf("\nEphemeral Key Exchange strength\n")
-		if f_ffdhe.ID != 0 {
-			_, _, serverKeyExchange, err := probe.HalfHandshake(max_version, []sslprobe.CipherInfo{f_ffdhe})
-			if err != nil {
-				panic(err)
+
+		if sv.FFDHSize > 0 || len(sv.SupportedCurves) > 0 {
+			fmt.Printf("\nEphemeral Key Exchange strength\n")
+
+			if sv.FFDHSize > 0 {
+				col = cStrength(sv.FFDHSize)
+				fmt.Printf("   DH Modulus size: %5s bits\n", col(fmt.Sprintf("%d", sv.FFDHSize)))
 			}
-			if serverKeyExchange != nil {
-				dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
-				col = cStrength(dh_len * 8)
-				fmt.Printf("DH Modulus size: %5s bits\n", col(fmt.Sprintf("%d", dh_len*8)))
-			}
-		}
-		if f_ecdhe.ID != 0 {
-			_, _, serverKeyExchange, err := probe.HalfHandshake(max_version, []sslprobe.CipherInfo{f_ecdhe})
-			if err != nil {
-				panic(err)
-			}
-			if serverKeyExchange != nil {
-				if serverKeyExchange[0] == 3 {
-					// Named Curve - whew!
-					id := uint16(serverKeyExchange[1])<<8 | uint16(serverKeyExchange[2])
-					curve := sslprobe.IDCurve(id)
-					dlen := curve.DHBits()
-					col = cStrength(dlen)
-					fmt.Printf("Preferred Curve: %s (%d bits, eq %s bits DH)\n", col(curve.Name), curve.Bits, col(fmt.Sprintf("%d", dlen)))
-				} else {
-					panic("Don't quite know how to handle this curve encoding")
-				}
+			if len(sv.SupportedCurves) > 0 {
+				// TODO: probe and display all supported curves, in order of preference.
+				curve := sv.SupportedCurves[0]
+				dlen := curve.DHBits()
+				col = cStrength(dlen)
+				fmt.Printf("   Preferred Curve: %s (%d bits, eq %s bits DH)\n", col(curve.Name), curve.Bits, col(fmt.Sprintf("%d", dlen)))
 			}
 		}
+
+		break
 	}
 }
 
