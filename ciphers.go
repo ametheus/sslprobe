@@ -102,7 +102,7 @@ var (
 	SC_RC2                             = CipherSymmetricInfo{"RC2", 64, 64, true}
 	SC_RC4                             = CipherSymmetricInfo{"RC4", 128, 1684, true}
 	SC_SEED                            = CipherSymmetricInfo{"SEED", 128, 128, false}
-	SC_3DES                            = CipherSymmetricInfo{"3DES", 112, 64, true}
+	SC_3DES                            = CipherSymmetricInfo{"3DES", 112, 64, false}
 	SC_ARIA128                         = CipherSymmetricInfo{"ARIA128", 128, 128, false}
 	SC_ARIA256                         = CipherSymmetricInfo{"ARIA256", 256, 128, false}
 	SC_AES128                          = CipherSymmetricInfo{"AES128", 128, 128, false}
