@@ -37,7 +37,7 @@ func (p *Probe) cipherPreference(version TLSVersion) []CipherInfo {
 	candidates := 0
 
 	for candidates < maxl {
-		ciph, vv, _ := p.Connect(version, rv[candidates:])
+		ciph, vv, _ := p.Connect(version, rv[candidates:], AllCurves)
 		if ciph.ID != 0x0000 && vv == version {
 			for i, c := range rv {
 				if i <= candidates {
@@ -64,11 +64,10 @@ func (p *Probe) fillSupportedVersions() {
 	all := []TLSVersion{SSL_2_0, SSL_3_0, TLS_1_0, TLS_1_1, TLS_1_2, TLS_1_3}
 
 	for _, v := range all {
-		cph, vv, _ := p.Connect(v, AllCiphers)
+		cph, vv, _ := p.Connect(v, AllCiphers, AllCurves)
 		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
 		if nvd.Supported {
 			nvd.SupportedCiphers = p.cipherPreference(v)
-
 			p.fillFFDHSize(&nvd)
 			p.fillCurvePreferences(&nvd)
 		}
@@ -82,7 +81,7 @@ func (p *Probe) fillFFDHSize(vd *versionDetails) {
 			continue
 		}
 
-		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c})
+		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
 		if err == nil && serverKeyExchange != nil {
 			dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
 			vd.FFDHSize = dh_len * 8
@@ -97,7 +96,7 @@ func (p *Probe) fillCurvePreferences(vd *versionDetails) {
 			continue
 		}
 
-		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c})
+		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
 		if err == nil && serverKeyExchange != nil {
 			if serverKeyExchange[0] == 3 {
 				// Named Curve - whew!
@@ -110,8 +109,8 @@ func (p *Probe) fillCurvePreferences(vd *versionDetails) {
 	}
 }
 
-func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
-	serverHello, _, _, err := p.HalfHandshake(version, ciphers)
+func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
+	serverHello, _, _, err := p.HalfHandshake(version, ciphers, curves)
 	if err != nil {
 		return
 	}
@@ -121,7 +120,7 @@ func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo) (rv CipherInfo
 	return
 }
 
-func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
+func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
 	var c net.Conn
 	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
 	if err != nil {
@@ -137,6 +136,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 	extensions := make(TLSExtensionList, 0, 2)
 	if version >= TLS_1_0 {
 		extensions = append(extensions, ServerNameIndication(p.Host))
+		extensions = append(extensions, HelloSupportedCurves(curves))
 	}
 
 	extension_length := extensions.Len()
@@ -170,7 +170,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 	idx += 2
 	// Extensions
 	if extension_length > 0 {
-		pint2(clientHello[idx:], extension_length - 2)
+		pint2(clientHello[idx:], extension_length-2)
 		idx += 2
 
 		for _, x := range extensions {
@@ -179,8 +179,8 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 		}
 	}
 
-	// fmt.Printf("%s", clientHello)
-	//return
+	// hexdump(clientHello)
+	// return
 
 	_, err = c.Write(clientHello)
 	if err != nil {

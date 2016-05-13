@@ -3,16 +3,18 @@ package sslprobe
 type ExtensionType uint16
 
 const (
-	EXT_server_name ExtensionType = 0
-	EXT_max_fragment_length = 1
-	EXT_client_certificate_url = 2
-	EXT_trusted_ca_keys = 3
-	EXT_truncated_hmac = 4
-	EXT_status_request = 5
+	EXT_server_name            ExtensionType = 0
+	EXT_max_fragment_length                  = 1
+	EXT_client_certificate_url               = 2
+	EXT_trusted_ca_keys                      = 3
+	EXT_truncated_hmac                       = 4
+	EXT_status_request                       = 5
+	EXT_elliptic_curves                      = 10
+	EXT_ec_point_formats                     = 11
 )
 
 type TLSExtension struct {
-	Type ExtensionType
+	Type     ExtensionType
 	Contents []byte
 }
 
@@ -37,12 +39,25 @@ func ServerNameIndication(servername string) TLSExtension {
 
 	// TODO: IDN conversion
 	bhost := []byte(servername)
-	rv.Contents = make([]byte, len(bhost) + 5)
+	rv.Contents = make([]byte, len(bhost)+5)
 
-	pint2(rv.Contents[0:], len(bhost) + 3)
+	pint2(rv.Contents[0:], len(bhost)+3)
 	rv.Contents[2] = 0x00
 	pint2(rv.Contents[3:], len(bhost))
 	copy(rv.Contents[5:], bhost)
+
+	return rv
+}
+
+func HelloSupportedCurves(curves []CurveInfo) TLSExtension {
+	rv := TLSExtension{Type: EXT_elliptic_curves}
+
+	rv.Contents = make([]byte, 2+2*len(curves))
+	pint2(rv.Contents[0:], 2*len(curves))
+
+	for i, c := range curves {
+		pint2(rv.Contents[2+2*i:], int(c.ID))
+	}
 
 	return rv
 }
