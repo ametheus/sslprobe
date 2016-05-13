@@ -27,28 +27,10 @@ func main() {
 	var max_version sslprobe.TLSVersion = 0
 	fmt.Printf("Protocol support:")
 	for _, sv := range probe.SupportedVersions {
-		col = nil
-		v, s := sv.Version, sv.Supported
-		if s {
-			max_version = v
-			if v == sslprobe.SSL_2_0 {
-				col = tc.Bred
-			} else if v == sslprobe.SSL_3_0 {
-				col = tc.Red
-			} else if v == sslprobe.TLS_1_2 || v == sslprobe.TLS_1_3 {
-				col = tc.Bgreen
-			} else {
-				col = tc.Green
-			}
-		} else {
-			if v != sslprobe.SSL_2_0 && v != sslprobe.TLS_1_3 {
-				col = tc.Bblack
-			}
+		if sv.Supported {
+			max_version = sv.Version
 		}
-
-		if col != nil {
-			fmt.Printf("  %s", col(v.String()))
-		}
+		fmt.Printf("  %s", sv.Pretty())
 	}
 	fmt.Printf("\n")
 	if max_version == 0 {
@@ -65,7 +47,7 @@ func main() {
 			}
 			fmt.Printf("  %s\n", sv.Version)
 			for _, c := range sv.SupportedCiphers {
-				fmt.Printf("     %s\n", FCipher(c))
+				fmt.Printf("     %s\n", c.Pretty())
 			}
 		}
 	}
@@ -108,41 +90,4 @@ func cStrength(bits int) func(string) string {
 	} else {
 		return tc.Bred
 	}
-}
-
-func FCipher(c sslprobe.CipherInfo) string {
-	var colour func(string) string = nil
-	suffix := ""
-	if c.Kex.Broken || c.Auth.Broken || c.Cipher.Broken || c.MAC.Broken {
-		colour = tc.Red
-		suffix = colour("  INSECURE")
-	} else if c.Cipher.KeySize < 112 || c.MAC.TagSize < 160 {
-		colour = tc.Yellow
-		suffix = colour("  WEAK")
-	}
-	pad := "                                              "
-
-	fs := tc.Yellow("no FS")
-	if c.Kex.ForwardSecure {
-		fs = tc.Green("  FS ")
-	}
-
-	aead := "    "
-	if c.MAC.AEAD {
-		aead = "AEAD"
-	}
-
-	cstr := fmt.Sprintf("%3d", c.Cipher.KeySize)
-	if colour == nil && c.Kex.ForwardSecure && c.Cipher.KeySize >= 128 && c.MAC.AEAD {
-		cstr = tc.Green(cstr)
-		aead = tc.Green(aead)
-	}
-
-	if colour == nil {
-		colour = func(s string) string {
-			return s
-		}
-	}
-
-	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%46:], fs, cstr, aead, suffix)
 }
