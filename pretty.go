@@ -26,7 +26,7 @@ func (c CipherInfo) Pretty() string {
 		colour = tc.Yellow
 		suffix = colour("  WEAK")
 	}
-	pad := "                                              "
+	pad := "                                                   "
 
 	fs := tc.Yellow("no FS")
 	if c.Kex.ForwardSecure {
@@ -50,7 +50,7 @@ func (c CipherInfo) Pretty() string {
 		}
 	}
 
-	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%46:], fs, cstr, aead, suffix)
+	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%len(pad):], fs, cstr, aead, suffix)
 }
 
 func (vd versionDetails) Pretty() string {
