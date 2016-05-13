@@ -134,9 +134,16 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 		c.Close()
 	}()
 
-	serverName := []byte(p.Host)
-	extension_length := 2 + 2 + 2 + 3 + len(serverName)
-	clienthello_length := 46 + 2*len(ciphers) + 2 + 2 + extension_length
+	extensions := make(TLSExtensionList, 0, 2)
+	if version >= TLS_1_0 {
+		extensions = append(extensions, ServerNameIndication(p.Host))
+	}
+
+	extension_length := extensions.Len()
+	clienthello_length := 46 + 2*len(ciphers) + 2
+	if extension_length > 0 {
+		clienthello_length += 2 + extension_length
+	}
 
 	clientHello := make([]byte, clienthello_length)
 	clientHello[0] = 22 // handshake
@@ -162,17 +169,15 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 
 	idx += 2
 	// Extensions
-	pint2(clientHello[idx:], extension_length)
+	if extension_length > 0 {
+		pint2(clientHello[idx:], extension_length)
+		idx += 2
 
-	// Server Name
-	pint2(clientHello[idx+2:], 0) // server_name
-	pint2(clientHello[idx+4:], 2+3+len(serverName))
-	idx += 6
-	pint2(clientHello[idx:], 3+len(serverName))
-	idx += 2
-	clientHello[idx] = 0
-	pint2(clientHello[idx+1:], len(serverName))
-	copy(clientHello[idx+3:], serverName)
+		for _, x := range extensions {
+			x.Copy(clientHello[idx:])
+			idx += x.Len()
+		}
+	}
 
 	// fmt.Printf("%s", clientHello)
 	//return
