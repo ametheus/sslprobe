@@ -1,6 +1,6 @@
 
 ssl2-server: rsa1024.pem bin/openssl-098
-	bin/openssl-098 s_server -accept 10200 -cert rsa1024.pem -debug -msg
+	bin/openssl-098 s_server -ssl2 -accept 10200 -cert rsa1024.pem -debug -msg
 
 rsa1024.pem: rsa1024.key
 	openssl req -x509 -new -key rsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out rsa1024.crt -days 3653
