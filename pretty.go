@@ -21,10 +21,10 @@ func (c CipherInfo) Pretty() string {
 	suffix := ""
 	if c.Kex.Broken || c.Auth.Broken || c.Cipher.Broken || c.MAC.Broken {
 		colour = tc.Red
-		suffix = colour("  INSECURE")
-	} else if c.Cipher.KeySize < 112 || c.MAC.TagSize < 160 {
+		suffix = "  INSECURE"
+	} else if c.Cipher.KeySize < 128 || c.MAC.TagSize < 160 {
 		colour = tc.Yellow
-		suffix = colour("  WEAK")
+		suffix = "  WEAK"
 	}
 	pad := "                                                   "
 
@@ -40,8 +40,7 @@ func (c CipherInfo) Pretty() string {
 
 	cstr := fmt.Sprintf("%3d", c.Cipher.KeySize)
 	if colour == nil && c.Kex.ForwardSecure && c.Cipher.KeySize >= 128 && c.MAC.AEAD {
-		cstr = tc.Green(cstr)
-		aead = tc.Green(aead)
+		colour = tc.Green
 	}
 
 	if colour == nil {
@@ -50,7 +49,7 @@ func (c CipherInfo) Pretty() string {
 		}
 	}
 
-	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%len(pad):], fs, cstr, aead, suffix)
+	return fmt.Sprintf("%s%s  %s %s %s%s", colour(c.Name), pad[len(c.Name)%len(pad):], fs, colour(cstr), colour(aead), colour(suffix))
 }
 
 func (vd versionDetails) Pretty() string {
