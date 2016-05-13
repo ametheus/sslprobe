@@ -142,7 +142,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 	extension_length := extensions.Len()
 	clienthello_length := 46 + 2*len(ciphers) + 2
 	if extension_length > 0 {
-		clienthello_length += 2 + extension_length
+		clienthello_length += extension_length
 	}
 
 	clientHello := make([]byte, clienthello_length)
@@ -170,7 +170,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo) (serverH
 	idx += 2
 	// Extensions
 	if extension_length > 0 {
-		pint2(clientHello[idx:], extension_length)
+		pint2(clientHello[idx:], extension_length - 2)
 		idx += 2
 
 		for _, x := range extensions {
