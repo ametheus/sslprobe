@@ -38,7 +38,7 @@ func (p *Probe) cipherPreference(version TLSVersion) []CipherInfo {
 	candidates := 0
 
 	for candidates < maxl {
-		ciph, vv, _ := p.Connect(version, rv[candidates:], AllCurves)
+		ciph, vv, _ := p.agreeCipher(version, rv[candidates:], AllCurves)
 		if ciph.ID != 0x0000 && vv == version {
 			for i, c := range rv {
 				if i <= candidates {
@@ -64,7 +64,7 @@ func (p *Probe) fillSupportedVersions() {
 	p.SupportedVersions = make([]versionDetails, 0, 6)
 
 	for _, v := range AllVersions {
-		cph, vv, _ := p.Connect(v, AllCiphers, AllCurves)
+		cph, vv, _ := p.agreeCipher(v, AllCiphers, AllCurves)
 		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
 		p.SupportedVersions = append(p.SupportedVersions, nvd)
 	}
@@ -101,25 +101,43 @@ func (p *Probe) fillFFDHSize(vd *versionDetails) {
 }
 
 func (p *Probe) fillCurvePreferences(vd *versionDetails) {
-	for _, c := range vd.SupportedCiphers {
-		if c.Kex != KX_ECDHE {
-			continue
-		}
+	maxl := len(AllCurves)
+	rv := make([]CurveInfo, maxl)
+	copy(rv, AllCurves)
+	candidates := 0
 
-		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
-		if err == nil && serverKeyExchange != nil {
-			if serverKeyExchange[0] == 3 {
-				// Named Curve - whew!
-				id := uint16(serverKeyExchange[1])<<8 | uint16(serverKeyExchange[2])
-				vd.SupportedCurves = []CurveInfo{IDCurve(id)}
-			} else {
-				panic("Don't quite know how to handle this curve encoding")
-			}
+	ciphers := make([]CipherInfo, 0, 16)
+	for _, c := range vd.SupportedCiphers {
+		if c.Kex == KX_ECDHE {
+			ciphers = append(ciphers, c)
 		}
 	}
+
+	for candidates < maxl {
+		curv, err := p.agreeCurve(vd.Version, ciphers, rv[candidates:])
+		if err == nil {
+			for i, c := range rv {
+				if i <= candidates {
+					continue
+				}
+				if c.ID == curv.ID {
+					for j := i; j > candidates; j-- {
+						rv[j] = rv[j-1]
+					}
+					rv[candidates] = curv
+					break
+				}
+			}
+			candidates++
+		} else {
+			break
+		}
+	}
+
+	vd.SupportedCurves = rv[0:candidates]
 }
 
-func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
+func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
 	serverHello, _, _, err := p.HalfHandshake(version, ciphers, curves)
 	if err != nil {
 		return
@@ -127,6 +145,25 @@ func (p *Probe) Connect(version TLSVersion, ciphers []CipherInfo, curves []Curve
 	sess_l := int(serverHello[34])
 	rv = IDCipher(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
 	tls_version = TLSVersion(uint16(serverHello[0])<<8 | uint16(serverHello[1]))
+	return
+}
+
+func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CurveInfo, err error) {
+	_, _, serverKeyExchange, err := p.HalfHandshake(version, ciphers, curves)
+	if err != nil {
+		return
+	} else if serverKeyExchange == nil {
+		err = fmt.Errorf("No ServerKeyExchange found")
+		return
+	}
+
+	if serverKeyExchange[0] == 3 {
+		// Named Curve - whew!
+		id := uint16(serverKeyExchange[1])<<8 | uint16(serverKeyExchange[2])
+		rv = IDCurve(id)
+	} else {
+		panic("Don't quite know how to handle this curve encoding")
+	}
 	return
 }
 

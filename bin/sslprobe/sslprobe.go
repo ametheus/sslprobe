@@ -122,12 +122,18 @@ func main() {
 				col = cStrength(sv.FFDHSize)
 				fmt.Printf("   DH Modulus size: %5s bits\n", col(fmt.Sprintf("%d", sv.FFDHSize)))
 			}
-			if len(sv.SupportedCurves) > 0 {
-				// TODO: probe and display all supported curves, in order of preference.
+			if len(sv.SupportedCurves) == 1 {
 				curve := sv.SupportedCurves[0]
 				dlen := curve.DHBits()
 				col = cStrength(dlen)
 				fmt.Printf("   Preferred Curve: %s (%d bits, eq %s bits DH)\n", col(curve.Name), curve.Bits, col(fmt.Sprintf("%d", dlen)))
+			} else if len(sv.SupportedCurves) > 1 {
+				fmt.Printf("   Supported elliptic curves:\n")
+				for _, curve := range sv.SupportedCurves {
+					dlen := curve.DHBits()
+					col = cStrength(dlen)
+					fmt.Printf("        %s (%d bits, eq %s bits DH)\n", col(curve.Name), curve.Bits, col(fmt.Sprintf("%d", dlen)))
+				}
 			}
 		}
 
