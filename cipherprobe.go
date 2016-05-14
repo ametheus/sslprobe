@@ -62,9 +62,8 @@ func (p *Probe) cipherPreference(version TLSVersion) []CipherInfo {
 
 func (p *Probe) fillSupportedVersions() {
 	p.SupportedVersions = make([]versionDetails, 0, 6)
-	all := []TLSVersion{SSL_2_0, SSL_3_0, TLS_1_0, TLS_1_1, TLS_1_2, TLS_1_3}
 
-	for _, v := range all {
+	for _, v := range AllVersions {
 		cph, vv, _ := p.Connect(v, AllCiphers, AllCurves)
 		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
 		p.SupportedVersions = append(p.SupportedVersions, nvd)

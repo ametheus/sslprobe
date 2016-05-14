@@ -17,6 +17,13 @@ var (
 	full_a  = flag.Bool("f", false, "Alias for --full")
 	quick_a = flag.Bool("q", false, "Alias for --quick")
 	port_a  = flag.Int("p", 443, "Alias for --port")
+
+	just_ssl2  = flag.Bool("ssl2", false, "Just use SSLv2 (experimental)")
+	just_ssl3  = flag.Bool("ssl3", false, "Just use SSLv3")
+	just_tls10 = flag.Bool("tls10", false, "Just use TLSv1.0")
+	just_tls11 = flag.Bool("tls11", false, "Just use TLSv1.1")
+	just_tls12 = flag.Bool("tls12", false, "Just use TLSv1.2")
+	just_tls13 = flag.Bool("tls13", false, "Just use TLSv1.3 (experimental)")
 )
 
 func init() {
@@ -29,6 +36,20 @@ func init() {
 	}
 	if *full {
 		*quick = false
+	}
+
+	if *just_tls13 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.TLS_1_3}
+	} else if *just_tls12 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.TLS_1_2}
+	} else if *just_tls11 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.TLS_1_1}
+	} else if *just_tls10 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.TLS_1_0}
+	} else if *just_ssl3 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.SSL_3_0}
+	} else if *just_ssl2 {
+		sslprobe.AllVersions = []sslprobe.TLSVersion{sslprobe.SSL_2_0}
 	}
 
 	if *port == 443 && *port_a != 443 {

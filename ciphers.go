@@ -38,6 +38,14 @@ func (v TLSVersion) String() string {
 	return fmt.Sprintf("SSLVersion 0x%04x", uint16(v))
 }
 
+var AllVersions []TLSVersion = []TLSVersion{
+	SSL_2_0,
+	SSL_3_0,
+	TLS_1_0,
+	TLS_1_1,
+	TLS_1_2,
+	TLS_1_3}
+
 type CipherInfo struct {
 	ID     uint16
 	Name   string
