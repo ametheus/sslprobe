@@ -137,6 +137,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 	if version >= TLS_1_0 {
 		extensions = append(extensions, ServerNameIndication(p.Host))
 		extensions = append(extensions, HelloSupportedCurves(curves))
+		extensions = append(extensions, HelloSignatureAlgorithms())
 	}
 
 	extension_length := extensions.Len()

@@ -11,6 +11,7 @@ const (
 	EXT_status_request                       = 5
 	EXT_elliptic_curves                      = 10
 	EXT_ec_point_formats                     = 11
+	EXT_signature_algorithms                 = 13
 )
 
 type TLSExtension struct {
@@ -57,6 +58,33 @@ func HelloSupportedCurves(curves []CurveInfo) TLSExtension {
 
 	for i, c := range curves {
 		pint2(rv.Contents[2+2*i:], int(c.ID))
+	}
+
+	return rv
+}
+
+func HelloSignatureAlgorithms() TLSExtension {
+	hashes := []byte{1, // md5
+		2, // sha1
+		3, // sha224
+		4, // sha256
+		5, // sha384
+		6} // sha512
+	sigs := []byte{1, // rsa
+		2, // dsa
+		3} // ecdsa
+
+	rv := TLSExtension{Type: EXT_signature_algorithms,
+		Contents: make([]byte, 2+2*len(hashes)*len(sigs))}
+	pint2(rv.Contents[0:], 2*len(hashes)*len(sigs))
+
+	i := 2
+	for _, h := range hashes {
+		for _, s := range sigs {
+			rv.Contents[i] = h
+			rv.Contents[i+1] = s
+			i += 2
+		}
 	}
 
 	return rv
