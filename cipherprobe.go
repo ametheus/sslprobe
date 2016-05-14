@@ -67,12 +67,22 @@ func (p *Probe) fillSupportedVersions() {
 	for _, v := range all {
 		cph, vv, _ := p.Connect(v, AllCiphers, AllCurves)
 		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
-		if nvd.Supported {
-			nvd.SupportedCiphers = p.cipherPreference(v)
-			p.fillFFDHSize(&nvd)
-			p.fillCurvePreferences(&nvd)
-		}
 		p.SupportedVersions = append(p.SupportedVersions, nvd)
+	}
+}
+
+func (p *Probe) FillDetails(version TLSVersion) {
+	for i, _ := range p.SupportedVersions {
+		nvd := &p.SupportedVersions[i]
+		if nvd.Version != version {
+			continue
+		}
+		if !nvd.Supported {
+			continue
+		}
+		nvd.SupportedCiphers = p.cipherPreference(nvd.Version)
+		p.fillFFDHSize(nvd)
+		p.fillCurvePreferences(nvd)
 	}
 }
 

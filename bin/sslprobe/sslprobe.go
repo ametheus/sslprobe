@@ -1,28 +1,54 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	tc "github.com/thijzert/go-termcolours"
 	"github.com/thijzert/sslprobe"
 	"os"
 )
 
+var (
+	port = flag.Int("port", 443, "Connect to this port")
+
+	full  = flag.Bool("full", false, "Perform cipher and curve preference tests on every supported version rather than just the highest")
+	quick = flag.Bool("quick", false, "Just test for protocol version support and exit early")
+
+	full_a  = flag.Bool("f", false, "Alias for --full")
+	quick_a = flag.Bool("q", false, "Alias for --quick")
+	port_a  = flag.Int("p", 443, "Alias for --port")
+)
+
+func init() {
+	flag.Parse()
+	if *quick_a {
+		*quick = true
+	}
+	if *full_a {
+		*full = true
+	}
+	if *full {
+		*quick = false
+	}
+
+	if *port == 443 && *port_a != 443 {
+		*port = *port_a
+	}
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s {HOST} [{PORT}]\n", os.Args[0])
+	if flag.NArg() == 0 {
+		fmt.Fprintf(os.Stderr, "Usage: %s {HOST} [{OPTIONS}]\n", os.Args[0])
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	host := os.Args[1]
-	port := 443
-	if len(os.Args) > 2 {
-		fmt.Sscanf(os.Args[2], "%d", &port)
-	}
 	var col func(string) string = nil
 
-	fmt.Printf("Server:   %s\n", tc.Bblue(fmt.Sprintf("%s:%d", host, port)))
+	host := flag.Arg(0)
+	fmt.Printf("Server:   %s\n", tc.Bblue(fmt.Sprintf("%s:%d", host, *port)))
 
-	probe := sslprobe.New(host, port)
+	probe := sslprobe.New(host, *port)
 
 	var max_version sslprobe.TLSVersion = 0
 	fmt.Printf("Protocol support:")
@@ -33,6 +59,9 @@ func main() {
 		fmt.Printf("  %s", sv.Pretty())
 	}
 	fmt.Printf("\n")
+	if *quick {
+		return
+	}
 	if max_version == 0 {
 		return
 	}
@@ -40,8 +69,13 @@ func main() {
 	fmt.Printf("\nCipher suites, in server-preferred order:\n")
 	var cipher_prefs []sslprobe.CipherInfo = []sslprobe.CipherInfo{}
 	for i, _ := range probe.SupportedVersions {
-		sv := probe.SupportedVersions[len(probe.SupportedVersions)-i-1]
+		sv := &probe.SupportedVersions[len(probe.SupportedVersions)-i-1]
+		if !*full && sv.Version != max_version {
+			continue
+		}
 		if sv.Supported {
+			probe.FillDetails(sv.Version)
+
 			if len(cipher_prefs) == 0 {
 				cipher_prefs = sv.SupportedCiphers
 			}
