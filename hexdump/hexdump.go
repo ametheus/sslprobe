@@ -2,9 +2,11 @@ package hexdump
 
 import (
 	"fmt"
+	"io"
+	"os"
 )
 
-func Dump(buf []byte) {
+func Fdump(w io.Writer, buf []byte) {
 	var idx int = 0
 
 	for idx < len(buf) {
@@ -12,9 +14,13 @@ func Dump(buf []byte) {
 		if bd > len(buf) {
 			bd = len(buf)
 		}
-		fmt.Printf("%04x -%-48s    %-16s\n", idx, hexbytes(buf[idx:bd]), printable(buf[idx:bd]))
+		fmt.Fprintf(w, "%04x -%-48s    %-16s\n", idx, hexbytes(buf[idx:bd]), printable(buf[idx:bd]))
 		idx += 16
 	}
+}
+
+func Dump(buf []byte) {
+	Fdump(os.Stdout, buf)
 }
 
 func hexbytes(buf []byte) []byte {
