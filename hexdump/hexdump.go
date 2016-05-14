@@ -1,10 +1,10 @@
-package sslprobe
+package hexdump
 
 import (
 	"fmt"
 )
 
-func hexdump(buf []byte) {
+func Dump(buf []byte) {
 	var idx int = 0
 
 	for idx < len(buf) {

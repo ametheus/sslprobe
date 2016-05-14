@@ -3,6 +3,7 @@ package sslprobe
 import (
 	"crypto/rand"
 	"fmt"
+	hex "github.com/thijzert/sslprobe/hexdump"
 	"net"
 )
 
@@ -180,8 +181,10 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 		}
 	}
 
-	// hexdump(clientHello)
-	// return
+	if false {
+		hex.Dump(clientHello)
+		return
+	}
 
 	_, err = c.Write(clientHello)
 	if err != nil {
