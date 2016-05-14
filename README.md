@@ -8,13 +8,16 @@ Usage
 -----
 From the command-line, type:
 ```
-./sslprobe.php {HOST} [{PORT}]
+go run bin/sslprobe/sslprobe.go [{OPTIONS}] {HOST}
 ```
 e.g.
 ```
-./sslprobe.php github.com
+go run bin/sslprobe/sslprobe.go github.com
 ```
-If you omit the port number, this script will default to 443 (HTTPS).
+Options include:
+
+* *-f* or *--full*: perform cipher preference scans on all supported versions instead of just the highest;
+* *-q* or *--quick*: don't perform cipher preference scans at all.
 
 Example output:
 ![Example output](example-output.png)
