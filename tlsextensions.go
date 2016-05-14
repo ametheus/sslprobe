@@ -63,6 +63,10 @@ func HelloSupportedCurves(curves []CurveInfo) TLSExtension {
 	return rv
 }
 
+func HelloECPointFormats() TLSExtension {
+	return TLSExtension{EXT_ec_point_formats, []byte{3, 0, 1, 2}}
+}
+
 func HelloSignatureAlgorithms() TLSExtension {
 	hashes := []byte{1, // md5
 		2, // sha1
