@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/x509"
 	"flag"
 	"fmt"
 	tc "github.com/thijzert/go-termcolours"
@@ -85,6 +86,27 @@ func main() {
 	}
 	if max_version == 0 {
 		return
+	}
+
+	// Print certificate chain(s)
+	for i, _ := range probe.SupportedVersions {
+		sv := &probe.SupportedVersions[len(probe.SupportedVersions)-i-1]
+		if !*full && sv.Version != max_version {
+			continue
+		}
+		if !sv.Supported || sv.CertificateChain == nil {
+			continue
+		}
+
+		fmt.Printf("\nCertificate chain:\n")
+		for i, b := range sv.CertificateChain {
+			cert, err := x509.ParseCertificate(b)
+			if err != nil {
+				fmt.Printf("   %2d %s: %s\n", i, tc.Red("error"), err)
+				continue
+			}
+			fmt.Printf("   %2d subject: %s\n      issuer:  %s\n", i, cert.Subject, cert.Issuer)
+		}
 	}
 
 	fmt.Printf("\nCipher suites, in server-preferred order:\n")

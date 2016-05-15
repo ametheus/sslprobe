@@ -24,6 +24,7 @@ func New(host string, port int) *Probe {
 type versionDetails struct {
 	Version          TLSVersion
 	Supported        bool
+	CertificateChain [][]byte
 	SupportedCiphers []CipherInfo
 	CipherPreference bool
 	FFDHSize         int
@@ -64,8 +65,30 @@ func (p *Probe) fillSupportedVersions() {
 	p.SupportedVersions = make([]versionDetails, 0, 6)
 
 	for _, v := range AllVersions {
-		cph, vv, _ := p.agreeCipher(v, AllCiphers, AllCurves)
-		nvd := versionDetails{Version: v, Supported: cph.ID != 0x0000 && v == vv}
+		serverHello, serverCertificate, _, err := p.HalfHandshake(v, AllCiphers, AllCurves)
+		if err != nil {
+			continue
+		}
+		sess_l := int(serverHello[34])
+		ciph := uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l])
+		vv := TLSVersion(uint16(serverHello[0])<<8 | uint16(serverHello[1]))
+
+		nvd := versionDetails{Version: v, Supported: ciph != 0x0000 && v == vv}
+
+		if len(serverCertificate) >= 3 {
+			nvd.CertificateChain = make([][]byte, 0)
+			lcert := int(serverCertificate[0])<<16 | int(serverCertificate[1])<<8 | int(serverCertificate[2])
+			serverCertificate = serverCertificate[3 : lcert+3]
+
+			for len(serverCertificate) >= 3 {
+				lcert = int(serverCertificate[0])<<16 | int(serverCertificate[1])<<8 | int(serverCertificate[2])
+				buf := make([]byte, lcert)
+				copy(buf, serverCertificate[3:3+lcert])
+				nvd.CertificateChain = append(nvd.CertificateChain, buf)
+				serverCertificate = serverCertificate[lcert+3:]
+			}
+		}
+
 		p.SupportedVersions = append(p.SupportedVersions, nvd)
 	}
 }
