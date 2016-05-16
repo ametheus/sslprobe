@@ -81,9 +81,6 @@ func main() {
 		fmt.Printf("  %s", sv.Pretty())
 	}
 	fmt.Printf("\n")
-	if *quick {
-		return
-	}
 	if max_version == 0 {
 		return
 	}
@@ -107,6 +104,10 @@ func main() {
 			}
 			fmt.Printf("   %2d subject: %s\n      issuer:  %s\n", i, cert.Subject, cert.Issuer)
 		}
+	}
+
+	if *quick {
+		return
 	}
 
 	fmt.Printf("\nCipher suites, in server-preferred order:\n")
