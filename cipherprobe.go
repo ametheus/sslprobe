@@ -67,6 +67,8 @@ func (p *Probe) fillSupportedVersions() {
 	for _, v := range AllVersions {
 		serverHello, serverCertificate, _, err := p.HalfHandshake(v, AllCiphers, AllCurves)
 		if err != nil {
+			nvd := versionDetails{Version: v, Supported: false}
+			p.SupportedVersions = append(p.SupportedVersions, nvd)
 			continue
 		}
 		sess_l := int(serverHello[34])
