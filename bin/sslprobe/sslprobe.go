@@ -4,6 +4,7 @@ import (
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/x509"
 	"flag"
 	"fmt"
@@ -241,8 +242,10 @@ func prettyCertificate(cert *x509.Certificate) (string, string) {
 		issuer = issuer[0:45]
 	}
 
-	subject = fmt.Sprintf("subject: %-45s  key type:  %s", subject, key)
-	issuer = fmt.Sprintf("issuer:  %-45s  signature: %s", issuer, sig)
+	fpr := tc.Bblack(fmt.Sprintf("%x", sha1.Sum(cert.Raw)))
+
+	subject = fmt.Sprintf("subject: %-45s  key type: %s / sig: %s", subject, key, sig)
+	issuer = fmt.Sprintf("issuer:  %-45s  fingerprint: %s", issuer, fpr)
 
 	return subject, issuer
 }
