@@ -41,17 +41,22 @@ func (p *Probe) cipherPreference(version TLSVersion) []CipherInfo {
 	for candidates < maxl {
 		ciph, vv, _ := p.agreeCipher(version, rv[candidates:], AllCurves)
 		if ciph.ID != 0x0000 && vv == version {
+			found := false
 			for i, c := range rv {
-				if i <= candidates {
+				if i < candidates {
 					continue
 				}
 				if c.ID == ciph.ID {
+					found = true
 					for j := i; j > candidates; j-- {
 						rv[j] = rv[j-1]
 					}
 					rv[candidates] = ciph
 					break
 				}
+			}
+			if !found {
+				break
 			}
 			candidates++
 		} else {
@@ -141,17 +146,22 @@ func (p *Probe) fillCurvePreferences(vd *versionDetails) {
 	for candidates < maxl {
 		curv, err := p.agreeCurve(vd.Version, ciphers, rv[candidates:])
 		if err == nil {
+			found := false
 			for i, c := range rv {
-				if i <= candidates {
+				if i < candidates {
 					continue
 				}
 				if c.ID == curv.ID {
+					found = true
 					for j := i; j > candidates; j-- {
 						rv[j] = rv[j-1]
 					}
 					rv[candidates] = curv
 					break
 				}
+			}
+			if !found {
+				break
 			}
 			candidates++
 		} else {
