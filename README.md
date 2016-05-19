@@ -21,3 +21,8 @@ Options include:
 
 Example output:
 ![Example output](example-output.png)
+
+License
+-------
+
+This repository is shared under a BSD 3-clause license. See the file COPYING for details.
