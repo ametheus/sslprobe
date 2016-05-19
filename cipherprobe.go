@@ -7,6 +7,9 @@ import (
 	"net"
 )
 
+// HACK: Add a flag to disable the ec_point_formats extension
+var TheresNoPoint bool = false
+
 type Probe struct {
 	Host              string
 	Port              int
@@ -217,7 +220,9 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 
 	extensions := make(TLSExtensionList, 0, 2)
 	if version >= TLS_1_0 {
-		extensions = append(extensions, HelloECPointFormats())
+		if !TheresNoPoint {
+			extensions = append(extensions, HelloECPointFormats())
+		}
 		extensions = append(extensions, ServerNameIndication(p.Host))
 		extensions = append(extensions, HelloSupportedCurves(curves))
 		extensions = append(extensions, HelloSignatureAlgorithms())

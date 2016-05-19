@@ -23,6 +23,8 @@ var (
 	quick_a = flag.Bool("q", false, "Alias for --quick")
 	port_a  = flag.Int("p", 443, "Alias for --port")
 
+	theres_no_point = flag.Bool("theres_no_point", false, "Disable the ec_point_format extension")
+
 	just_ssl2  = flag.Bool("ssl2", false, "Just use SSLv2 (experimental)")
 	just_ssl3  = flag.Bool("ssl3", false, "Just use SSLv3")
 	just_tls10 = flag.Bool("tls10", false, "Just use TLSv1.0")
@@ -41,6 +43,10 @@ func init() {
 	}
 	if *full {
 		*quick = false
+	}
+
+	if *theres_no_point {
+		sslprobe.TheresNoPoint = true
 	}
 
 	if *just_tls13 {
