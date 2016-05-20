@@ -65,7 +65,20 @@ func (p *Probe) fillSupportedVersions() {
 	p.SupportedVersions = make([]versionDetails, 0, 6)
 
 	for _, v := range AllVersions {
-		serverHello, serverCertificate, _, err := p.HalfHandshake(v, AllCiphers, AllCurves)
+		if v == SSL_2_0 {
+			cph, err := p.v2CipherPreference()
+			var nvd versionDetails
+			if err != nil {
+				nvd = versionDetails{Version: v, Supported: false}
+			} else {
+				nvd = versionDetails{Version: v, Supported: true, SupportedCiphers: cph}
+			}
+			p.SupportedVersions = append(p.SupportedVersions, nvd)
+			continue
+		}
+
+		ciphers := AllCiphers
+		serverHello, serverCertificate, _, err := p.HalfHandshake(v, ciphers, AllCurves)
 		if err != nil {
 			nvd := versionDetails{Version: v, Supported: false}
 			p.SupportedVersions = append(p.SupportedVersions, nvd)
@@ -96,6 +109,9 @@ func (p *Probe) fillSupportedVersions() {
 }
 
 func (p *Probe) FillDetails(version TLSVersion) {
+	if version == SSL_2_0 {
+		return
+	}
 	for i, _ := range p.SupportedVersions {
 		nvd := &p.SupportedVersions[i]
 		if nvd.Version != version {
@@ -168,7 +184,7 @@ func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []C
 		return
 	}
 	sess_l := int(serverHello[34])
-	rv = IDCipher(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+	rv = IDCipher(uint32(serverHello[35+sess_l])<<8 | uint32(serverHello[36+sess_l]))
 	tls_version = TLSVersion(uint16(serverHello[0])<<8 | uint16(serverHello[1]))
 	return
 }
@@ -193,6 +209,10 @@ func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []Cu
 }
 
 func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
+	if version <= SSL_2_0 {
+		return p.v2HalfHandshake(version, ciphers, curves)
+	}
+
 	var c net.Conn
 	c, err = net.Dial("tcp", fmt.Sprintf("%s:%d", p.Host, p.Port))
 	if err != nil {
@@ -288,7 +308,7 @@ func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 	}
 
 	sess_l := int(serverHello[34])
-	cipher := IDCipher(uint16(serverHello[35+sess_l])<<8 | uint16(serverHello[36+sess_l]))
+	cipher := IDCipher(uint32(serverHello[35+sess_l])<<8 | uint32(serverHello[36+sess_l]))
 
 	if cipher.Auth == AU_RSA || cipher.Auth == AU_DSA || cipher.Auth == AU_ECDSA {
 		hstype, serverCertificate, err = NextHandshake(c)
