@@ -1,6 +1,8 @@
 
 ssl2-server: rsa1024.pem bin/openssl-098
 	bin/openssl-098 s_server -ssl2 -accept 10200 -cert rsa1024.pem -debug -msg
+098-server: rsa1024.pem dsa1024.pem bin/openssl-098
+	bin/openssl-098 s_server -cipher ALL -accept 10200 -cert rsa1024.pem -debug -msg
 
 rsa1024.pem: rsa1024.key
 	openssl req -x509 -new -key rsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out rsa1024.crt -days 3653
@@ -8,6 +10,12 @@ rsa1024.pem: rsa1024.key
 	rm  rsa1024.key rsa1024.crt
 rsa1024.key:
 	openssl genrsa -out rsa1024.key 1024
+dsa1024.pem: dsa1024.key
+	openssl req -x509 -new -key dsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out dsa1024.crt -days 3653
+	cat dsa1024.key dsa1024.crt > dsa1024.pem
+	rm  dsa1024.key dsa1024.crt
+dsa1024.key:
+	openssl dsaparam -genkey 1024 -out dsa1024.key
 
 github-openssl:
 	git clone https://github.com/openssl/openssl.git github-openssl
