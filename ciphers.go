@@ -7,7 +7,7 @@ import (
 type TLSVersion uint16
 
 const (
-	SSL_2_0  TLSVersion = 0x0200
+	SSL_2_0  TLSVersion = 0x0002
 	SSL_2_99            = 0x02ff
 	SSL_3_0             = 0x0300
 	TLS_1_0             = 0x0301
@@ -47,7 +47,7 @@ var AllVersions []TLSVersion = []TLSVersion{
 	TLS_1_3}
 
 type CipherInfo struct {
-	ID     uint16
+	ID     uint32
 	Name   string
 	Kex    CipherKeyExchangeInfo
 	Auth   CipherAuthenticationInfo
@@ -143,7 +143,14 @@ var (
 var TLS_NULL CipherInfo = CipherInfo{0x0000, "TLS_NULL_WITH_NULL_NULL", KX_NULL, AU_NULL, SC_NULL, MAC_NULL}
 var TLS_FALLBACK_SCSV CipherInfo = CipherInfo{0x5600, "TLS_FALLBACK_SCSV", KX_NULL, AU_NULL, SC_NULL, MAC_NULL}
 
-var AllCiphers []CipherInfo = []CipherInfo{
+var AllCiphersIncludingSSL2 []CipherInfo = []CipherInfo{
+	CipherInfo{0x010080, "SSL_RC4_128_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x020080, "SSL_RC4_128_EXPORT40_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x030080, "SSL_RC2_CBC_128_CBC_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x040080, "SSL_RC2_CBC_128_CBC_EXPORT40_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x050080, "SSL_IDEA_128_CBC_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x060040, "SSL_DES_64_CBC_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
+	CipherInfo{0x0700C0, "SSL_DES_192_EDE3_CBC_WITH_MD5", KX_NULL, AU_NULL, SC_NULL, MAC_NULL},
 	CipherInfo{0x0001, "TLS_RSA_WITH_NULL_MD5", KX_RSA, AU_RSA, SC_NULL, MAC_MD5},
 	CipherInfo{0x0002, "TLS_RSA_WITH_NULL_SHA", KX_RSA, AU_RSA, SC_NULL, MAC_SHA1},
 	CipherInfo{0x0003, "TLS_RSA_EXPORT_WITH_RC4_40_MD5", KX_EXPORT, AU_RSA, SC_RC4_40, MAC_MD5},
@@ -471,11 +478,13 @@ var AllCiphers []CipherInfo = []CipherInfo{
 	CipherInfo{0xCC14, "LIBRESSL_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", KX_ECDHE, AU_ECDSA, SC_CHACHA20, MAC_POLY1305_SHA256},
 	CipherInfo{0xCC15, "LIBRESSL_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256", KX_FFDHE, AU_RSA, SC_CHACHA20, MAC_POLY1305_SHA256}}
 
-func IDCipher(id uint16) CipherInfo {
+var AllCiphers []CipherInfo = AllCiphersIncludingSSL2[7:]
+
+func IDCipher(id uint32) CipherInfo {
 	if id == 0x5600 {
 		return TLS_FALLBACK_SCSV
 	}
-	for _, c := range AllCiphers {
+	for _, c := range AllCiphersIncludingSSL2 {
 		if c.ID == id {
 			return c
 		}

@@ -3,5 +3,6 @@
 /openssl-latest.tar.gz
 /rsa1024.pem
 /ecdsa384.pem
+/dsa1024.pem
 /bin/openssl-*
 /github-openssl
