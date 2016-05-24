@@ -9,21 +9,27 @@ ec-rsa-server: rsa1024.pem ecdsa384.pem bin/openssl-101
 rsa1024.pem: rsa1024.key
 	openssl req -x509 -new -key rsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out rsa1024.crt -days 3653
 	cat rsa1024.key rsa1024.crt > rsa1024.pem
-	rm  rsa1024.key rsa1024.crt
+	rm  rsa1024.crt
 rsa1024.key:
 	openssl genrsa -out rsa1024.key 1024
 ecdsa384.pem: ecdsa384.key
 	openssl req -x509 -new -key ecdsa384.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out ecdsa384.crt -days 3653
 	cat ecdsa384.key ecdsa384.crt > ecdsa384.pem
-	rm  ecdsa384.key ecdsa384.crt
+	rm  ecdsa384.crt
 ecdsa384.key:
 	openssl ecparam -name secp384r1 -genkey -out ecdsa384.key
 dsa1024.pem: dsa1024.key
 	openssl req -x509 -new -key dsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out dsa1024.crt -days 3653
 	cat dsa1024.key dsa1024.crt > dsa1024.pem
-	rm  dsa1024.key dsa1024.crt
+	rm  dsa1024.crt
 dsa1024.key:
 	openssl dsaparam -genkey 1024 -out dsa1024.key
+bleed-target.key: bin/kg/kg.go
+	go run bin/kg/kg.go > bleed-target.key
+bleed-target.pem: bleed-target.key
+	openssl req -x509 -new -key bleed-target.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out bleed-target.crt -days 3653
+	cat bleed-target.key bleed-target.crt > bleed-target.pem
+	rm  bleed-target.crt
 
 github-openssl:
 	git clone https://github.com/openssl/openssl.git github-openssl
