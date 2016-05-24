@@ -26,3 +26,5 @@ License
 -------
 
 This repository is shared under a BSD 3-clause license. See the file COPYING for details.
+
+This repository also contains files imported from the Go project. Luckily, these files are similarly licensed.
