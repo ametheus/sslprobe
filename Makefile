@@ -34,32 +34,11 @@ bleed-target.pem: bleed-target.key
 github-openssl:
 	git clone https://github.com/openssl/openssl.git github-openssl
 bin/openssl-098: github-openssl
-	cd github-openssl && git checkout -- .
-	cd github-openssl && make clean
-	cd github-openssl && git clean -qfd
-	cd github-openssl && git checkout OpenSSL_0_9_8-stable
-	cd github-openssl && git pull --rebase origin OpenSSL_0_9_8-stable
-	cd github-openssl && ./config no-shared
-	cd github-openssl && make -j 4 build_apps
-	mv github-openssl/apps/openssl bin/openssl-098
-bin/openssl-master: github-openssl
-	cd github-openssl && git checkout -- .
-	cd github-openssl && make clean
-	cd github-openssl && git clean -qfd
-	cd github-openssl && git checkout master
-	cd github-openssl && git pull --rebase origin master
-	cd github-openssl && ./config no-shared
-	cd github-openssl && make -j 4 build_apps
-	mv github-openssl/apps/openssl bin/openssl-master
+	./build-openssl   OpenSSL_0_9_8-stable  openssl-098
 bin/openssl-101: github-openssl
-	cd github-openssl && git checkout -- .
-	cd github-openssl && make clean
-	cd github-openssl && git clean -qfd
-	cd github-openssl && git checkout OpenSSL_1_0_1-stable
-	cd github-openssl && git pull --rebase origin OpenSSL_1_0_1-stable
-	cd github-openssl && ./config no-shared
-	cd github-openssl && make -j 4 build_apps
-	mv github-openssl/apps/openssl bin/openssl-101
+	./build-openssl   OpenSSL_1_0_1-stable  openssl-101
+bin/openssl-master: github-openssl
+	./build-openssl   master  openssl-master
 
 bin/custom-openssl: openssl-latest
 	cd openssl-latest && ./config -DOPENSSL_DH_MAX_MODULUS_BITS=16000 no-shared && cd ..
