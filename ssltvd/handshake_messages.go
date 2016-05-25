@@ -24,6 +24,8 @@ type clientHelloMsg struct {
 	signatureAndHashes  []signatureAndHash
 	secureRenegotiation bool
 	alpnProtocols       []string
+	heartbeatSupported  bool
+	heartbeatMode       uint8
 }
 
 func (m *clientHelloMsg) equal(i interface{}) bool {
@@ -102,6 +104,10 @@ func (m *clientHelloMsg) marshal() []byte {
 		numExtensions++
 	}
 	if m.scts {
+		numExtensions++
+	}
+	if m.heartbeatSupported {
+		extensionsLength++
 		numExtensions++
 	}
 	if numExtensions > 0 {
@@ -282,6 +288,15 @@ func (m *clientHelloMsg) marshal() []byte {
 		z[1] = byte(extensionSCT)
 		// zero uint16 for the zero-length extension_data
 		z = z[4:]
+	}
+	if m.heartbeatSupported {
+		z[0] = byte(extensionHeartbeat >> 8)
+		z[1] = byte(extensionHeartbeat)
+		// The Heartbeat hello message is only one byte long
+		z[2] = 0
+		z[3] = 1
+		z[4] = m.heartbeatMode
+		z = z[5:]
 	}
 
 	m.raw = x
@@ -475,6 +490,12 @@ func (m *clientHelloMsg) unmarshal(data []byte) bool {
 			if length != 0 {
 				return false
 			}
+		case extensionHeartbeat:
+			if length != 1 {
+				return false
+			}
+			m.heartbeatSupported = true
+			m.heartbeatMode = data[0]
 		}
 		data = data[length:]
 	}
@@ -496,6 +517,8 @@ type serverHelloMsg struct {
 	ticketSupported     bool
 	secureRenegotiation bool
 	alpnProtocol        string
+	heartbeatSupported  bool
+	heartbeatMode       uint8
 }
 
 func (m *serverHelloMsg) equal(i interface{}) bool {
@@ -568,6 +591,10 @@ func (m *serverHelloMsg) marshal() []byte {
 			sctLen += len(sct) + 2
 		}
 		extensionsLength += 2 + sctLen
+		numExtensions++
+	}
+	if m.heartbeatSupported {
+		extensionsLength++
 		numExtensions++
 	}
 
@@ -661,6 +688,15 @@ func (m *serverHelloMsg) marshal() []byte {
 			copy(z[2:], sct)
 			z = z[len(sct)+2:]
 		}
+	}
+	if m.heartbeatSupported {
+		z[0] = byte(extensionHeartbeat >> 8)
+		z[1] = byte(extensionHeartbeat)
+		// The Heartbeat hello message is only one byte long
+		z[2] = 0
+		z[3] = 1
+		z[4] = m.heartbeatMode
+		z = z[5:]
 	}
 
 	m.raw = x
@@ -796,6 +832,12 @@ func (m *serverHelloMsg) unmarshal(data []byte) bool {
 				m.scts = append(m.scts, d[:sctLen])
 				d = d[sctLen:]
 			}
+		case extensionHeartbeat:
+			if length != 1 {
+				return false
+			}
+			m.heartbeatSupported = true
+			m.heartbeatMode = data[0]
 		}
 		data = data[length:]
 	}

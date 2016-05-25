@@ -5,6 +5,8 @@ ec-rsa-server: rsa1024.pem ecdsa384.pem bin/openssl-101
 	openssl s_server -tls1_2 -accept 10303 -cert ecdsa384.pem -dcert rsa1024.pem -debug -msg
 098-server: rsa1024.pem dsa1024.pem bin/openssl-098
 	bin/openssl-098 s_server -cipher ALL -accept 10200 -cert rsa1024.pem -debug -msg
+heartbleed-server: bleed-target.pem bin/openssl-101e
+	bin/openssl-101e s_server -tls1 -accept 10302 -cert bleed-target.pem -debug -msg
 
 rsa1024.pem: rsa1024.key
 	openssl req -x509 -new -key rsa1024.key -subj '/C=BQ/L=Low Earth Orbit/OU=International Space Station/CN=localhost' -out rsa1024.crt -days 3653
@@ -37,6 +39,8 @@ bin/openssl-098: github-openssl
 	./build-openssl   OpenSSL_0_9_8-stable  openssl-098
 bin/openssl-101: github-openssl
 	./build-openssl   OpenSSL_1_0_1-stable  openssl-101
+bin/openssl-101e: github-openssl
+	./build-openssl   OpenSSL_1_0_1e  openssl-101e
 bin/openssl-master: github-openssl
 	./build-openssl   master  openssl-master
 

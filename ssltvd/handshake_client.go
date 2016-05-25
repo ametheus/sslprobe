@@ -68,6 +68,8 @@ func (c *Conn) clientHandshake() error {
 		nextProtoNeg:        len(c.config.NextProtos) > 0,
 		secureRenegotiation: true,
 		alpnProtocols:       c.config.NextProtos,
+		heartbeatSupported:  true,
+		heartbeatMode:       heartbeatPeerAllowedToSend,
 	}
 
 	possibleCipherSuites := c.config.cipherSuites()
@@ -549,6 +551,11 @@ func (hs *clientHandshakeState) processServerHello() (bool, error) {
 		c.clientProtocolFallback = false
 	}
 	c.scts = hs.serverHello.scts
+
+	if hs.hello.heartbeatSupported && hs.serverHello.heartbeatSupported {
+		c.heartbeatSupported = true
+		c.heartbeatAllowed = (hs.serverHello.heartbeatMode == heartbeatPeerAllowedToSend)
+	}
 
 	if hs.serverResumedSession() {
 		// Restore masterSecret and peerCerts from previous state

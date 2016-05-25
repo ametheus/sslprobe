@@ -48,6 +48,11 @@ type Conn struct {
 	// handshake. This is the "tls-unique" channel binding value.
 	firstFinished [12]byte
 
+	// RFC 6520 Heartbeat protocol
+	heartbeatSupported bool // whether the heartbeat extension is enabled on the other end
+	heartbeatAllowed   bool // whether this end is allowed to send heartbeat messages
+	heartbeatData      []byte
+
 	clientProtocol         string
 	clientProtocolFallback bool
 
@@ -550,6 +555,7 @@ func (c *Conn) readRecord(want recordType) error {
 			c.sendAlert(alertInternalError)
 			return c.in.setErrorLocked(errors.New("ssltvd: application data record requested before handshake complete"))
 		}
+	case recordTypeHeartbeat:
 	}
 
 Again:
@@ -676,6 +682,14 @@ Again:
 			return c.in.setErrorLocked(c.sendAlert(alertNoRenegotiation))
 		}
 		c.hand.Write(data)
+
+	case recordTypeHeartbeat:
+		if typ != want {
+			// TODO: Handle heartbeat requests
+			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
+			break
+		}
+		c.heartbeatData = data
 	}
 
 	if b != nil {
