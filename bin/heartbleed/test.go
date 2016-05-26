@@ -39,7 +39,13 @@ func main() {
 		panic(err)
 	}
 
-	pl, err := c.Heartbeat(4, []byte("tree"))
+	pl, err := c.Heartbeat(6, []byte("potato"))
+	if err != nil {
+		panic(err)
+	}
+	hex.Dump(pl)
+
+	pl, err = c.Heartbeat(4, []byte("bird"))
 	if err != nil {
 		panic(err)
 	}
