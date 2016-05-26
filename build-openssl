@@ -1,0 +1,25 @@
+#!/bin/sh
+
+BRANCH=$1
+BINARY=$2
+
+shift
+shift
+
+if [ -z "$BRANCH" ]; then exit 1; fi
+if [ -z "$BINARY" ]; then exit 1; fi
+
+cd github-openssl
+git checkout -- .
+git clean -qfdx
+git checkout -q "$BRANCH"
+make clean
+./config no-shared "$@"
+make depend
+make -j 4
+make build_apps
+
+cd ..
+mv github-openssl/apps/openssl "bin/$BINARY"
+
+
