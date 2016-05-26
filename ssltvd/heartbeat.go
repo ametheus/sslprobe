@@ -4,7 +4,6 @@
 package ssltvd
 
 import "errors"
-import "fmt"
 
 const heartbeatPeerAllowedToSend uint8 = 1
 const heartbeatPeerNotAllowedToSend uint8 = 2
@@ -12,7 +11,9 @@ const heartbeatPeerNotAllowedToSend uint8 = 2
 var ErrHeartbeatNotSupported error = errors.New("ssltvd: Heartbeat protocol not supported")
 var ErrHeartbeatNotAllowed error = errors.New("ssltvd: We are not allowed to send Heartbeat messages")
 
+// Send a heartbeat request to the peer
 // "Are you still there? If so, respond with the word 'HAT' (3 letters)"
+// Callers must pinky-swear that length is always equal to len(payload)
 func (c *Conn) Heartbeat(length int, payload []byte) ([]byte, error) {
 	if !c.heartbeatSupported {
 		return nil, ErrHeartbeatNotSupported
@@ -29,11 +30,10 @@ func (c *Conn) Heartbeat(length int, payload []byte) ([]byte, error) {
 	for i := len(payload) + 3; i < len(buf); i++ {
 		buf[i] = 'd'
 	}
-	n, err := c.writeRecord(recordTypeHeartbeat, buf)
+	_, err := c.writeRecord(recordTypeHeartbeat, buf)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("bytes written: %d\n", n)
 
 	if err = c.readRecord(recordTypeHeartbeat); err != nil {
 		return nil, err
