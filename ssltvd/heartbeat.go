@@ -4,12 +4,14 @@
 package ssltvd
 
 import "errors"
+import "time"
 
 const heartbeatPeerAllowedToSend uint8 = 1
 const heartbeatPeerNotAllowedToSend uint8 = 2
 
 var ErrHeartbeatNotSupported error = errors.New("ssltvd: Heartbeat protocol not supported")
 var ErrHeartbeatNotAllowed error = errors.New("ssltvd: We are not allowed to send Heartbeat messages")
+var ErrHeartbeatTimeout error = errors.New("ssltvd: Timeout while waiting for Heartbeat response. The server is possibly down.")
 
 // Send a heartbeat request to the peer
 // "Are you still there? If so, respond with the word 'HAT' (3 letters)"
@@ -35,9 +37,19 @@ func (c *Conn) Heartbeat(length int, payload []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if err = c.readRecord(recordTypeHeartbeat); err != nil {
-		return nil, err
+	errc := make(chan error, 1)
+	go func() {
+		errc <- c.readRecord(recordTypeHeartbeat)
+	}()
+	select {
+	case err = <-errc:
+		if err != nil {
+			return nil, err
+		}
+	case <-time.After(500 * time.Millisecond):
+		return nil, ErrHeartbeatTimeout
 	}
+
 	if c.heartbeatData == nil || len(c.heartbeatData) < 3 || c.heartbeatData[0] != 2 {
 		return nil, errors.New("No Heartbeat response found.")
 	}

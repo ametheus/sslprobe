@@ -34,11 +34,6 @@ func main() {
 		panic(err)
 	}
 
-	_, err = c.Write([]byte("hi!\n"))
-	if err != nil {
-		panic(err)
-	}
-
 	pl, err := c.Heartbeat(6, []byte("potato"))
 	if err != nil {
 		panic(err)
