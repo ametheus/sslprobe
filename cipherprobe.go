@@ -11,6 +11,7 @@ type Probe struct {
 	Host              string
 	Port              int
 	SupportedVersions []versionDetails
+	Results           map[string]checkResult
 }
 
 func New(host string, port int) *Probe {

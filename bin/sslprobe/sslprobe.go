@@ -167,6 +167,32 @@ func main() {
 
 		break
 	}
+
+	probe.OtherChecks()
+
+	if probe.Results != nil {
+		fmt.Printf("\nOther scan results:\n")
+		for _, result := range probe.Results {
+			c := cSeverity(result.Severity)
+			fmt.Printf("   %-25s :  %s\n", result.Label, c(result.Result))
+		}
+	}
+}
+
+func cSeverity(s sslprobe.Severity) func(string) string {
+	if s == sslprobe.Bonus {
+		return tc.Green
+	} else if s == sslprobe.OK {
+		return tc.Bblack
+	} else if s == sslprobe.Bad {
+		return tc.Red
+	} else if s == sslprobe.BigFuckingProblem {
+		return tc.Bred
+	} else {
+		return func(s string) string {
+			return s
+		}
+	}
 }
 
 func cStrength(bits int) func(string) string {
