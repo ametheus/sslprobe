@@ -58,7 +58,6 @@ func (p *Probe) v2HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves
 
 	serverHello, err = readSSL2Capsule(c)
 	if err != nil {
-		panic(err)
 		return
 	}
 
