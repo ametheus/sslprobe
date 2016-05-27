@@ -84,7 +84,7 @@ func (p *Probe) fillSupportedVersions() {
 		}
 
 		ciphers := AllCiphers
-		serverHello, serverCertificate, _, err := p.HalfHandshake(v, ciphers, AllCurves)
+		serverHello, serverCertificate, _, err := p.halfHandshake(v, ciphers, AllCurves)
 		if err != nil {
 			nvd := versionDetails{Version: v, Supported: false}
 			p.SupportedVersions = append(p.SupportedVersions, nvd)
@@ -138,7 +138,7 @@ func (p *Probe) fillFFDHSize(vd *versionDetails) {
 			continue
 		}
 
-		_, _, serverKeyExchange, err := p.HalfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
+		_, _, serverKeyExchange, err := p.halfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
 		if err == nil && serverKeyExchange != nil {
 			dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
 			vd.FFDHSize = dh_len * 8
@@ -190,7 +190,7 @@ func (p *Probe) fillCurvePreferences(vd *versionDetails) {
 }
 
 func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
-	serverHello, _, _, err := p.HalfHandshake(version, ciphers, curves)
+	serverHello, _, _, err := p.halfHandshake(version, ciphers, curves)
 	if err != nil {
 		return
 	}
@@ -201,7 +201,7 @@ func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []C
 }
 
 func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CurveInfo, err error) {
-	_, _, serverKeyExchange, err := p.HalfHandshake(version, ciphers, curves)
+	_, _, serverKeyExchange, err := p.halfHandshake(version, ciphers, curves)
 	if err != nil {
 		return
 	} else if serverKeyExchange == nil {
@@ -219,7 +219,7 @@ func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []Cu
 	return
 }
 
-func (p *Probe) HalfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
+func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
 	if version <= SSL_2_0 {
 		return p.v2HalfHandshake(version, ciphers, curves)
 	}
