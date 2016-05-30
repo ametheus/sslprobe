@@ -84,7 +84,7 @@ func (p *Probe) fillSupportedVersions() {
 		}
 
 		ciphers := AllCiphers
-		serverHello, serverCertificate, _, err := p.halfHandshake(v, ciphers, AllCurves)
+		serverHello, serverCertificate, _, err := p.halfHandshake(v, ciphers, AllCurves, nil)
 		if err != nil {
 			nvd := versionDetails{Version: v, Supported: false}
 			p.SupportedVersions = append(p.SupportedVersions, nvd)
@@ -138,7 +138,7 @@ func (p *Probe) fillFFDHSize(vd *versionDetails) {
 			continue
 		}
 
-		_, _, serverKeyExchange, err := p.halfHandshake(vd.Version, []CipherInfo{c}, AllCurves)
+		_, _, serverKeyExchange, err := p.halfHandshake(vd.Version, []CipherInfo{c}, AllCurves, nil)
 		if err == nil && serverKeyExchange != nil {
 			dh_len := int(serverKeyExchange[0])<<8 | int(serverKeyExchange[1])
 			vd.FFDHSize = dh_len * 8
@@ -190,7 +190,7 @@ func (p *Probe) fillCurvePreferences(vd *versionDetails) {
 }
 
 func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CipherInfo, tls_version TLSVersion, err error) {
-	serverHello, _, _, err := p.halfHandshake(version, ciphers, curves)
+	serverHello, _, _, err := p.halfHandshake(version, ciphers, curves, nil)
 	if err != nil {
 		return
 	}
@@ -201,7 +201,7 @@ func (p *Probe) agreeCipher(version TLSVersion, ciphers []CipherInfo, curves []C
 }
 
 func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (rv CurveInfo, err error) {
-	_, _, serverKeyExchange, err := p.halfHandshake(version, ciphers, curves)
+	_, _, serverKeyExchange, err := p.halfHandshake(version, ciphers, curves, nil)
 	if err != nil {
 		return
 	} else if serverKeyExchange == nil {
@@ -219,7 +219,7 @@ func (p *Probe) agreeCurve(version TLSVersion, ciphers []CipherInfo, curves []Cu
 	return
 }
 
-func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
+func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves []CurveInfo, CompressionMethods []compressionMethod) (serverHello, serverCertificate, serverKeyExchange []byte, err error) {
 	if version <= SSL_2_0 {
 		return p.v2HalfHandshake(version, ciphers, curves)
 	}
@@ -236,6 +236,10 @@ func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 		c.Close()
 	}()
 
+	if CompressionMethods == nil {
+		CompressionMethods = []compressionMethod{compressionNone}
+	}
+
 	extensions := make(TLSExtensionList, 0, 2)
 	if version >= TLS_1_0 {
 		extensions = append(extensions, HelloECPointFormats())
@@ -245,7 +249,7 @@ func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 	}
 
 	extension_length := extensions.Len()
-	clienthello_length := 46 + 2*len(ciphers) + 2
+	clienthello_length := 46 + 2*len(ciphers) + 1 + len(CompressionMethods)
 	if extension_length > 0 {
 		clienthello_length += extension_length
 	}
@@ -268,11 +272,14 @@ func (p *Probe) halfHandshake(version TLSVersion, ciphers []CipherInfo, curves [
 	for i, c := range ciphers {
 		pint2(clientHello[46+2*i:], int(c.ID))
 	}
-	idx := 46 + 2*len(ciphers)
-	clientHello[idx+0] = 1 // Compression methods length
-	clientHello[idx+1] = 0 // None
 
-	idx += 2
+	idx := 46 + 2*len(ciphers)
+	clientHello[idx+0] = byte(len(CompressionMethods))
+	for i, c := range CompressionMethods {
+		clientHello[idx+1+i] = byte(c)
+	}
+	idx += 1 + len(CompressionMethods)
+
 	// Extensions
 	if extension_length > 0 {
 		pint2(clientHello[idx:], extension_length-2)
